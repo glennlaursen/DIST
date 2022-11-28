@@ -1,6 +1,6 @@
 import random
 import string
-import os, platform
+import platform
 
 def random_string(length=8):
     """
