@@ -159,6 +159,72 @@ def get_file(coded_fragments, max_erasures, file_size,
 # get_file_for_repair goes here
 # TO BE DONE
 
+def start_repair_process(files, repair_socket, repair_response_socket):
+    """
+    Implements the repair process for Reed Solomon erasure coding. It receives a list
+    of files that are to be checked. For each file, it sends queries to the Storage
+    nodes to check that all coded fragments are stored safely. If it finds a missing
+    fragment, it determines which Storage node was supposed to store it and repairs it.
+    This happens by first retrieving the original file data, then re-encoding the missing
+    fragment. It also handles multiple missing fragments for a file, as long as their
+    number does not exceed `max_erasures`.
+
+    :param files: List of files to be checked
+    :param repair_socket: A ZMQ PUB socket to send requests to the storage nodes
+    :param repair_response_socket: A ZMQ PULL socket on which the storage nodes respond.
+    :return: the number of missing fragments, the number of repaired fragments
+    """
+
+    number_of_missing_fragments = 0
+    number_of_repaired_fragments = 0
+    # Check that each file is actually stored on the storage nodes
+    for file in files:
+        print("Checking file with id: %s" % file["id"])
+        # We parse the JSON into a python dictionary
+        storage_details = json.loads(file["storage_details"])
+        # Iterate over each coded fragment to check that it is not missing
+        nodes = set()  # list of all storage nodes
+        nodes_with_fragment = set()  # list of storage nodes with fragments
+        coded_fragments = storage_details["coded_fragments"]
+        missing_fragments = []
+        existing_fragments = []
+
+        for fragment in coded_fragments:
+            task = messages_pb2.fragment_status_request()
+            task.fragment_name = fragment
+            header = messages_pb2.header()
+            header.request_type = messages_pb2.FRAGMENT_STATUS_REQ
+            repair_socket.send_multipart([b"all_nodes",
+                                          header.SerializeToString(),
+                                          task.SerializeToString()])
+            fragment_found = False
+
+            # Wait until we receive a response from each node
+            for task_nbr in range(STORAGE_NODES_NUM):
+                msg = repair_response_socket.recv()
+                response = messages_pb2.fragment_status_response()
+                response.ParseFromString(msg)
+                nodes.add(response.node_id)  # Build a set of nodes
+                if response.is_present == True:
+                    nodes_with_fragment.add(response.node_id)
+                    existing_fragments.append(fragment)
+                    fragment_found = True
+            if fragment_found == False:
+                print("Fragment %s lost" % fragment)
+                missing_fragments.append(fragment)
+                number_of_missing_fragments += 1
+            else:
+                print("Fragment %s OK" % fragment)
+
+        # If we have lost fragments, we must figure out where they were stored
+        # We assume that each node has exactly 1 or 0 fragments
+        nodes_without_fragment = list(nodes.difference(nodes_with_fragment))
+
+        # TO BE DONE: For each missing fragment, retrieve sufficient fragments to decode
+
+        # TO BE DONE: Reencode the missing fragment, store it on one of the appropriate nodes
+    return number_of_missing_fragments, number_of_repaired_fragments
+
 
 # Repair process implementation goes here
 # TO BE DONE

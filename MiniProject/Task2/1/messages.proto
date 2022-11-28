@@ -9,3 +9,29 @@ message getdata_request
 {
     string filename = 1;
 }
+
+message fragment_status_request
+{
+    string fragment_name = 1;
+}
+
+message fragment_status_response
+{
+    string fragment_name = 1;
+    bool is_present = 2;
+    string node_id = 3;
+}
+
+enum request_type
+{
+    FRAGMENT_STATUS_REQ = 0; // fragment_status_request
+    FRAGMENT_DATA_REQ = 1; // getdata_request
+    STORE_FRAGMENT_DATA_REQ = 2; // storedata_request
+}
+
+// This message is sent in the first frame of the request,
+// so the other side knows what format to expect in the second frame
+message header
+{
+    request_type request_type = 1;
+}

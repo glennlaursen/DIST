@@ -10,17 +10,18 @@ import random
 import string
 import logging
 
-import zmq # For ZMQ
-import time # For waiting a second for ZMQ connections
-import math # For cutting the file in half
-import messages_pb2 # Generated Protobuf messages
-import io # For sending binary data in a HTTP response
+import zmq  # For ZMQ
+import time  # For waiting a second for ZMQ connections
+import math  # For cutting the file in half
+import messages_pb2  # Generated Protobuf messages
+import io  # For sending binary data in a HTTP response
 import logging
 
 import raid1
 import reedsolomon
 
 from utils import is_raspberry_pi
+
 
 def get_db():
     if 'db' not in g:
@@ -67,39 +68,39 @@ repair_response_socket.bind("tcp://*:5561")
 time.sleep(1)
 print("Listening to ZMQ messages on tcp://*:5558 and tcp://*:5561")
 
-
 # Instantiate the Flask app (must be before the endpoint functions)
 app = Flask(__name__)
 # Close the DB connection after serving the request
 app.teardown_appcontext(close_db)
 
+
 @app.route('/')
 def hello():
     return make_response({'message': 'Hello World!'})
 
-@app.route('/files',  methods=['GET'])
+
+@app.route('/files', methods=['GET'])
 def list_files():
     db = get_db()
     cursor = db.execute("SELECT * FROM `file`")
-    if not cursor: 
+    if not cursor:
         return make_response({"message": "Error connecting to the database"}, 500)
-    
+
     files = cursor.fetchall()
     # Convert files from sqlite3.Row object (which is not JSON-encodable) to 
     # a standard Python dictionary simply by casting
     files = [dict(file) for file in files]
-    
+
     return make_response({"files": files})
-#
 
-@app.route('/files/<int:file_id>',  methods=['GET'])
+
+@app.route('/files/<int:file_id>', methods=['GET'])
 def download_file(file_id):
-
     db = get_db()
     cursor = db.execute("SELECT * FROM `file` WHERE `id`=?", [file_id])
-    if not cursor: 
+    if not cursor:
         return make_response({"message": "Error connecting to the database"}, 500)
-    
+
     f = cursor.fetchone()
     if not f:
         return make_response({"message": "File {} not found".format(file_id)}, 404)
@@ -107,25 +108,25 @@ def download_file(file_id):
     # Convert to a Python dictionary
     f = dict(f)
     print("File requested: {}".format(f['filename']))
-    
+
     # Parse the storage details JSON string
     import json
     storage_details = json.loads(f['storage_details'])
 
     if f['storage_mode'] == 'raid1':
-        
+
         part1_filenames = storage_details['part1_filenames']
         part2_filenames = storage_details['part2_filenames']
 
         file_data = raid1.get_file(
-            part1_filenames, 
-            part2_filenames, 
-            data_req_socket, 
+            part1_filenames,
+            part2_filenames,
+            data_req_socket,
             response_socket
         )
 
     elif f['storage_mode'] == 'erasure_coding_rs':
-        
+
         coded_fragments = storage_details['coded_fragments']
         max_erasures = storage_details['max_erasures']
 
@@ -133,23 +134,22 @@ def download_file(file_id):
             coded_fragments,
             max_erasures,
             f['size'],
-            data_req_socket, 
+            data_req_socket,
             response_socket
         )
 
     return send_file(io.BytesIO(file_data), mimetype=f['content_type'])
-#
+
 
 # HTTP HEAD requests are served by the GET endpoint of the same URL,
 # so we'll introduce a new endpoint URL for requesting file metadata.
-@app.route('/files/<int:file_id>/info',  methods=['GET'])
+@app.route('/files/<int:file_id>/info', methods=['GET'])
 def get_file_metadata(file_id):
-
     db = get_db()
     cursor = db.execute("SELECT * FROM `file` WHERE `id`=?", [file_id])
-    if not cursor: 
+    if not cursor:
         return make_response({"message": "Error connecting to the database"}, 500)
-    
+
     f = cursor.fetchone()
     if not f:
         return make_response({"message": "File {} not found".format(file_id)}, 404)
@@ -159,16 +159,15 @@ def get_file_metadata(file_id):
     print("File: %s" % f)
 
     return make_response(f)
-#
 
-@app.route('/files/<int:file_id>',  methods=['DELETE'])
+
+@app.route('/files/<int:file_id>', methods=['DELETE'])
 def delete_file(file_id):
-
     db = get_db()
     cursor = db.execute("SELECT * FROM `file` WHERE `id`=?", [file_id])
-    if not cursor: 
+    if not cursor:
         return make_response({"message": "Error connecting to the database"}, 500)
-    
+
     f = cursor.fetchone()
     if not f:
         return make_response({"message": "File {} not found".format(file_id)}, 404)
@@ -183,19 +182,19 @@ def delete_file(file_id):
 
     # Return empty 200 Ok response
     return make_response('TODO: implement this endpoint', 404)
-#
+
 
 @app.route('/files_mp', methods=['POST'])
 def add_files_multipart():
     # Flask separates files from the other form fields
     payload = request.form
     files = request.files
-    
+
     # Make sure there is a file in the request
     if not files or not files.get('file'):
         logging.error("No file was uploaded in the request!")
         return make_response("File missing!", 400)
-    
+
     # Reference to the file under 'file' key
     file = files.get('file')
     # The sender encodes a the file name and type together with the file contents
@@ -205,7 +204,7 @@ def add_files_multipart():
     data = bytearray(file.read())
     size = len(data)
     print("File received: %s, size: %d bytes, type: %s" % (filename, size, content_type))
-    
+
     # Read the requested storage mode from the form (default value: 'raid1')
     storage_mode = payload.get('storage', 'raid1')
     print("Storage mode: %s" % storage_mode)
@@ -224,7 +223,7 @@ def add_files_multipart():
         # we need to convert to int manually), set default value to 1
         max_erasures = int(payload.get('max_erasures', 1))
         print("Max erasures: %d" % (max_erasures))
-        
+
         # Store the file contents with Reed Solomon erasure coding
         fragment_names = reedsolomon.store_file(data, max_erasures, send_task_socket, response_socket)
 
@@ -232,7 +231,7 @@ def add_files_multipart():
             "coded_fragments": fragment_names,
             "max_erasures": max_erasures
         }
-    
+
     else:
         logging.error("Unexpected storage mode: %s" % storage_mode)
         return make_response("Wrong storage mode", 400)
@@ -246,8 +245,8 @@ def add_files_multipart():
     )
     db.commit()
 
-    return make_response({"id": cursor.lastrowid }, 201)
-#
+    return make_response({"id": cursor.lastrowid}, 201)
+
 
 @app.route('/files', methods=['POST'])
 def add_files():
@@ -258,7 +257,7 @@ def add_files():
     size = len(file_data)
 
     file_data_1_names, file_data_2_names = raid1.store_file(file_data, send_task_socket, response_socket)
-    
+
     # Insert the File record in the DB
     db = get_db()
     cursor = db.execute(
@@ -268,12 +267,31 @@ def add_files():
     db.commit()
 
     # Return the ID of the new file record with HTTP 201 (Created) status code
-    return make_response({"id": cursor.lastrowid }, 201)
+    return make_response({"id": cursor.lastrowid}, 201)
+
+
 #
 
 
 # Reed-Solomon repair goes here
 # TO BE DONE
+
+# Initiate repair process
+@app.route('/services/rs_repair', methods=['GET'])
+def rs_repair():
+    # Retrieve the list of files stored using Reed-Solomon from the database
+    db = get_db()
+    cursor = db.execute("SELECT `id`, `storage_details`, `size` FROM `file` WHERE `storage_mode`='erasure_coding_rs'")
+    if not cursor:
+        return make_response({"message": "Error connecting to the database"}, 500)
+    rs_files = cursor.fetchall()
+    rs_files = [dict(file) for file in rs_files]
+    fragments_missing, fragments_repaired = reedsolomon.start_repair_process(rs_files,
+                                                                             repair_socket,
+                                                                             repair_response_socket)
+    return make_response({"fragments_missing": fragments_missing,
+                          "fragments_repaired": fragments_repaired})
+
 
 # Automated RS repair goes here
 # TO BE DONE
@@ -285,6 +303,6 @@ def server_error(e):
 
 
 # Start the Flask app (must be after the endpoint functions) 
-host_local_computer = "localhost" # Listen for connections on the local computer
-host_local_network = "0.0.0.0" # Listen for connections on the local network
+host_local_computer = "localhost"  # Listen for connections on the local computer
+host_local_network = "0.0.0.0"  # Listen for connections on the local network
 app.run(host=host_local_network if is_raspberry_pi() else host_local_computer, port=9000)
