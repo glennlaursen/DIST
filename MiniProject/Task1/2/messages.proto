@@ -3,6 +3,7 @@ syntax = "proto3";
 message storedata_request
 {
     string filename = 1;
+    repeated string replica_locations = 2;
 }
 
 message getdata_request

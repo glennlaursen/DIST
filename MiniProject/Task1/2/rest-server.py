@@ -12,8 +12,7 @@ import time  # For waiting a second for ZMQ connections
 import zmq  # For ZMQ
 from flask import Flask, make_response, g, request, send_file
 
-import raid1
-import reedsolomon
+import hdfs
 from utils import is_raspberry_pi
 
 import json
@@ -39,26 +38,6 @@ def close_db(e=None):
 
 # Initiate ZMQ sockets
 context = zmq.Context()
-
-# Socket to send tasks to Storage Nodes
-send_task_socket = context.socket(zmq.PUSH)
-send_task_socket.bind("tcp://*:5557")
-
-# Socket to receive messages from Storage Nodes
-response_socket = context.socket(zmq.PULL)
-response_socket.bind("tcp://*:5558")
-
-# Publisher socket for data request broadcasts
-data_req_socket = context.socket(zmq.PUB)
-data_req_socket.bind("tcp://*:5559")
-
-# Publisher socket for fragment repair broadcasts
-repair_socket = context.socket(zmq.PUB)
-repair_socket.bind("tcp://*:5560")
-
-# Socket to receive repair messages from Storage Nodes
-repair_response_socket = context.socket(zmq.PULL)
-repair_response_socket.bind("tcp://*:5561")
 
 n_replicas_k = data_folder = sys.argv[1] if len(sys.argv) > 1 else 3
 
@@ -112,14 +91,7 @@ def download_file(file_id):
     # Parse the storage details JSON string
     storage_details = json.loads(f['storage_details'])
 
-
-    filenames = storage_details['filenames']
-
-    file_data = raid1.get_file(
-        filenames,
-        data_req_socket,
-        response_socket
-    )
+    file_data = hdfs.get_file(storage_details, context)
 
     return send_file(io.BytesIO(file_data), mimetype=f['content_type'])
 
@@ -198,32 +170,7 @@ def add_files_multipart():
     storage_mode = payload.get('storage', 'raid1')
     print("Storage mode: %s" % storage_mode)
 
-    if storage_mode == 'raid1':
-        file_data_names = raid1.store_file(data, n_replicas_k, send_task_socket, response_socket)
-
-        storage_details = {
-            "filenames": file_data_names,
-            "n_replicas_k": n_replicas_k
-        }
-
-    elif storage_mode == 'erasure_coding_rs':
-        # Reed Solomon code
-        # Parse max_erasures (everything is a string in request.form, 
-        # we need to convert to int manually), set default value to 1
-        max_erasures = int(payload.get('max_erasures', 1))
-        print("Max erasures: %d" % max_erasures)
-
-        # Store the file contents with Reed Solomon erasure coding
-        fragment_names = reedsolomon.store_file(data, max_erasures, send_task_socket, response_socket)
-
-        storage_details = {
-            "coded_fragments": fragment_names,
-            "max_erasures": max_erasures
-        }
-
-    else:
-        logging.error("Unexpected storage mode: %s" % storage_mode)
-        return make_response("Wrong storage mode", 400)
+    storage_details = hdfs.store_file(data, n_replicas_k, context)
 
     # Insert the File record in the DB
     db = get_db()
@@ -232,6 +179,8 @@ def add_files_multipart():
         (filename, size, content_type, storage_mode, json.dumps(storage_details))
     )
     db.commit()
+
+    print('Storage details: (filename: ' + filename + ', size: ' + str(size) + ', content_type: ' + content_type + ', storage_mode: ' + storage_mode + ', storage_details: ' + json.dumps(storage_details))
 
     return make_response({"id": cursor.lastrowid}, 201)
 

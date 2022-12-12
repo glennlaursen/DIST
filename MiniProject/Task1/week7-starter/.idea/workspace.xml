@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ChangeListManager">
+    <list default="true" id="987512e6-68ba-4af3-afea-8a2ee46573a1" name="Changes" comment="">
+      <change afterPath="$PROJECT_DIR$/../1/.idea/dataSources.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../1/.idea/sqldialects.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../1/node1/.id" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../1/node1/O0nJqmCS" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../1/node2/.id" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../1/node2/HPdhtlj1" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../1/node3/.id" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../1/node4/.id" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../1/node4/JOq3ZRfN" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../1/raid1.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../1/reedsolomon.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../1/utils.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../../Task2/1/.idea/1.iml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../1/.idea/1.iml" beforeDir="false" afterPath="$PROJECT_DIR$/../1/.idea/1.iml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../1/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/../1/.idea/misc.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../1/.idea/modules.xml" beforeDir="false" afterPath="$PROJECT_DIR$/../1/.idea/modules.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../1/create_table.sql" beforeDir="false" afterPath="$PROJECT_DIR$/../1/create_table.sql" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../1/files.db" beforeDir="false" afterPath="$PROJECT_DIR$/../1/files.db" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../1/main.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../1/messages.proto" beforeDir="false" afterPath="$PROJECT_DIR$/../1/messages.proto" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../1/node1/0lZweuwL" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../1/node1/44bvz5F7" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../1/node1/7xr5fzGb" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../1/node1/80cP355H" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../1/node1/OpMMkxIF" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../1/node1/TlFA7aAD" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../1/node1/c4Z8R5ZN" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../1/node1/elKzOInX" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../1/node1/kUbX0c5s" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../1/node1/tpY6bIV4" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../1/node1/z7L1tgLf" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../1/node1/zF3hmCYW" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../1/rest-server.py" beforeDir="false" afterPath="$PROJECT_DIR$/../1/rest-server.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../1/storage-node.py" beforeDir="false" afterPath="$PROJECT_DIR$/../1/storage-node.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/.gitignore" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/dataSources.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/inspectionProfiles/profiles_settings.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/modules.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/modules.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/sqldialects.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/sqldialects.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/week7-starter.iml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/create_table.sql" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/files.db" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/kodo.cp39-win_amd64.pyd" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/messages.proto" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/messages_pb2.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node1/.id" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node1/O0nJqmCS" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node2/.id" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node2/HPdhtlj1" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node3/.id" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node4/.id" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node4/JOq3ZRfN" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/raid1.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/reedsolomon.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/rest-server.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/storage-node.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/utils.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../Task2/1/files.db" beforeDir="false" afterPath="$PROJECT_DIR$/../../Task2/1/files.db" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$/../../.." />
+  </component>
+  <component name="MarkdownSettingsMigration">
+    <option name="stateVersion" value="1" />
+  </component>
+  <component name="ProjectId" id="2IoCkzdaHwuGWkMeAHTbo5CyTDa" />
+  <component name="ProjectLevelVcsManager" settingsEditedManually="true" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "RunOnceActivity.OpenProjectViewOnStart": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "WebServerToolWindowFactoryState": "false"
+  }
+}]]></component>
+  <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="987512e6-68ba-4af3-afea-8a2ee46573a1" name="Changes" comment="" />
+      <created>1670838703207</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1670838703207</updated>
+      <workItem from="1670838706878" duration="1283000" />
+    </task>
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+  <component name="Vcs.Log.Tabs.Properties">
+    <option name="TAB_STATES">
+      <map>
+        <entry key="MAIN">
+          <value>
+            <State />
+          </value>
+        </entry>
+      </map>
+    </option>
+  </component>
+</project>

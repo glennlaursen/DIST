@@ -3,7 +3,7 @@ CREATE TABLE `file` (
    `filename` TEXT,
    `size` INTEGER,
    `content_type` TEXT,
-   `created` DATETIME DEFAULT CURRENT_TIMESTAMP,
-   `part1_filenames` TEXT,
-   `part2_filenames` TEXT
+   `storage_mode` TEXT,
+   `storage_details` TEXT,
+   `created` DATETIME DEFAULT CURRENT_TIMESTAMP
 );
