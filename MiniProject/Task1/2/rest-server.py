@@ -13,7 +13,7 @@ import zmq  # For ZMQ
 from flask import Flask, make_response, g, request, send_file
 
 import hdfs
-from utils import is_raspberry_pi
+from utils import is_raspberry_pi, is_docker
 
 import json
 
@@ -43,7 +43,7 @@ n_replicas_k = data_folder = sys.argv[1] if len(sys.argv) > 1 else 3
 
 # Wait for all workers to start and connect. 
 time.sleep(1)
-print("Listening to ZMQ messages on tcp://*:5558 and tcp://*:5561")
+logging.info("Listening to ZMQ messages on tcp://*:5558 and tcp://*:5561")
 
 # Instantiate the Flask app (must be before the endpoint functions)
 app = Flask(__name__)
@@ -71,8 +71,6 @@ def list_files():
     return make_response({"files": files})
 
 
-#
-
 @app.route('/files/<int:file_id>', methods=['GET'])
 def download_file(file_id):
     db = get_db()
@@ -86,7 +84,7 @@ def download_file(file_id):
 
     # Convert to a Python dictionary
     f = dict(f)
-    print("File requested: {}".format(f['filename']))
+    logging.info("File requested: {}".format(f['filename']))
 
     # Parse the storage details JSON string
     storage_details = json.loads(f['storage_details'])
@@ -95,8 +93,6 @@ def download_file(file_id):
 
     return send_file(io.BytesIO(file_data), mimetype=f['content_type'])
 
-
-#
 
 # HTTP HEAD requests are served by the GET endpoint of the same URL,
 # so we'll introduce a new endpoint URL for requesting file metadata.
@@ -113,12 +109,10 @@ def get_file_metadata(file_id):
 
     # Convert to a Python dictionary
     f = dict(f)
-    print("File: %s" % f)
+    logging.info("File: %s" % f)
 
     return make_response(f)
 
-
-#
 
 @app.route('/files/<int:file_id>', methods=['DELETE'])
 def delete_file(file_id):
@@ -133,7 +127,7 @@ def delete_file(file_id):
 
     # Convert to a Python dictionary
     f = dict(f)
-    print("File to delete: %s" % f)
+    logging.info("File to delete: %s" % f)
 
     # TODO Delete all chunks from the Storage Nodes
 
@@ -142,8 +136,6 @@ def delete_file(file_id):
     # Return empty 200 Ok response
     return make_response('TODO: implement this endpoint', 404)
 
-
-#
 
 @app.route('/files_mp', methods=['POST'])
 def add_files_multipart():
@@ -164,11 +156,11 @@ def add_files_multipart():
     # Load the file contents into a bytearray and measure its size
     data = bytearray(file.read())
     size = len(data)
-    print("File received: %s, size: %d bytes, type: %s" % (filename, size, content_type))
+    logging.info("File received: %s, size: %d bytes, type: %s" % (filename, size, content_type))
 
     # Read the requested storage mode from the form (default value: 'raid1')
     storage_mode = payload.get('storage', 'raid1')
-    print("Storage mode: %s" % storage_mode)
+    logging.info("Storage mode: %s" % storage_mode)
 
     storage_details = hdfs.store_file(data, n_replicas_k, context)
 
@@ -180,7 +172,8 @@ def add_files_multipart():
     )
     db.commit()
 
-    print('Storage details: (filename: ' + filename + ', size: ' + str(size) + ', content_type: ' + content_type + ', storage_mode: ' + storage_mode + ', storage_details: ' + json.dumps(storage_details))
+    logging.info('Storage details: (filename: ' + filename + ', size: ' + str(size) + ', content_type: ' + content_type
+          + ', storage_mode: ' + storage_mode + ', storage_details: ' + json.dumps(storage_details))
 
     return make_response({"id": cursor.lastrowid}, 201)
 
@@ -200,4 +193,4 @@ def server_error(e):
 # Start the Flask app (must be after the endpoint functions) 
 host_local_computer = "localhost"  # Listen for connections on the local computer
 host_local_network = "0.0.0.0"  # Listen for connections on the local network
-app.run(host=host_local_network if is_raspberry_pi() else host_local_computer, port=9000)
+app.run(host=host_local_network if is_raspberry_pi() or is_docker() else host_local_computer, port=9000)

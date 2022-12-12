@@ -13,7 +13,7 @@ REQUEST_TIMEOUT = 1000
 
 def store_file(file_data: bytearray, k: int, context: zmq.Context):
     """
-    Implements storing a file with RAID 1 using 4 storage nodes.
+    Implements storing a file in a delegated manner using 4 storage nodes.
 
     :param file_data: A bytearray that holds the file contents
     :param k: The number of replicas to store
@@ -25,7 +25,7 @@ def store_file(file_data: bytearray, k: int, context: zmq.Context):
     assert (k > 0)
     assert (k <= STORAGE_NODES_NUM)
 
-    # Generate two random chunk names for each half
+    # Generate a random name for the file.
     file_data_name = random_string()
     print("Filename for file: %s" % file_data_name)
 

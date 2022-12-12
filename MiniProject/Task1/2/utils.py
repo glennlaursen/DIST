@@ -2,7 +2,9 @@ import platform
 import random
 import string
 
-node_ips = ['node' + i for i in ["1", "2", "3", "4"]]
+node_ips = ['192.168.38.10' + i for i in ["1", "2", "3", "4"]]
+node_names_for_docker = ['node' + i for i in ["1", "2", "3", "4"]]
+
 
 def random_string(length=8):
     """
@@ -14,8 +16,6 @@ def random_string(length=8):
     """
     return ''.join([random.SystemRandom().choice(string.ascii_letters + string.digits) for n in range(length)])
 
-
-#
 
 def write_file(data, filename=None):
     """
@@ -44,15 +44,21 @@ def write_file(data, filename=None):
     return filename
 
 
-#
-
 def is_raspberry_pi():
     """
     Returns True if the current platform is a Raspberry Pi, otherwise False.
     """
-    print(platform.uname())
     return platform.uname().node == 'raspberrypi'
-#
+
+
+def is_docker():
+    return 'WSL' in platform.uname().release
+
 
 def get_k_node_ips(k: int) -> list[string]:
-    return random.sample(node_ips, k)
+    if is_raspberry_pi():
+        return random.sample(node_ips, k)
+    elif is_docker():
+        return random.sample(node_names_for_docker, k)
+    else:
+        return random.sample(node_ips, k)
