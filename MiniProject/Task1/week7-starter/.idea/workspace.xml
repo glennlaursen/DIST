@@ -2,13 +2,10 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="987512e6-68ba-4af3-afea-8a2ee46573a1" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/../2/.idea/sqldialects.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../2/Dockerfile" beforeDir="false" afterPath="$PROJECT_DIR$/../2/Dockerfile" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../2/files.db" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/../2/hdfs.py" beforeDir="false" afterPath="$PROJECT_DIR$/../2/hdfs.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../2/rest-server.py" beforeDir="false" afterPath="$PROJECT_DIR$/../2/rest-server.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../2/utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/../2/utils.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../../Task2/1/files.db" beforeDir="false" afterPath="$PROJECT_DIR$/../../Task2/1/files.db" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -42,7 +39,7 @@
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
       <updated>1670838703207</updated>
-      <workItem from="1670838706878" duration="1283000" />
+      <workItem from="1670838706878" duration="1999000" />
     </task>
     <servers />
   </component>

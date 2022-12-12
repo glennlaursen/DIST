@@ -55,7 +55,7 @@ def is_docker():
     return 'WSL' in platform.uname().release
 
 
-def get_k_node_ips(k: int) -> list[string]:
+def get_k_node_ips(k: int):
     if is_raspberry_pi():
         return random.sample(node_ips, k)
     elif is_docker():
