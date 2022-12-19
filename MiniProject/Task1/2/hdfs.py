@@ -4,6 +4,7 @@ import zmq
 
 import messages_pb2
 import utils
+import logging
 from utils import random_string
 
 STORAGE_NODES_NUM = 4
@@ -27,13 +28,13 @@ def store_file(file_data: bytearray, k: int, context: zmq.Context):
 
     # Generate a random name for the file.
     file_data_name = random_string()
-    print("Filename for file: %s" % file_data_name)
+    logging.info("Filename for file: %s" % file_data_name)
 
     task = messages_pb2.storedata_request()
 
     # Get list of k nodes, that should store the file
     replica_locations = utils.get_k_node_ips(k)
-    print("replica_locations for file: %s" % replica_locations)
+    logging.info("replica_locations for file: %s" % replica_locations)
 
     # Pick out the first one.
     next_node = replica_locations[0]
@@ -53,7 +54,7 @@ def store_file(file_data: bytearray, k: int, context: zmq.Context):
     ])
 
     resp = hdfs_send_data_socket.recv_string()
-    print('Received: %s' % resp)
+    logging.info('Received: %s' % resp)
 
     storage_details = {
         "filename": file_data_name,
@@ -83,7 +84,7 @@ def get_file(storage_details, context: zmq.Context):
         hdfs_data_req_socket = context.socket(zmq.REQ)
         hdfs_data_req_socket.connect('tcp://' + location + ':5561')
         hdfs_data_req_socket.send(task.SerializeToString())
-        print('Trying to get file from: ' + location)
+        logging.info('Trying to get file from: ' + location)
 
         # Check that node is online
         if (hdfs_data_req_socket.poll(REQUEST_TIMEOUT) & zmq.POLLIN) != 0:
@@ -94,13 +95,13 @@ def get_file(storage_details, context: zmq.Context):
             # Second frame: data
             file_data = result[1]
 
-            print("Received %s" % filename_received)
+            logging.info("Received %s" % filename_received)
 
             hdfs_data_req_socket.close()
 
             return file_data
         else:
             # Location is offline, try next one
-            print(location + ' is offline :(')
+            logging.warning(location + ' is offline :(')
             hdfs_data_req_socket.close()
             continue

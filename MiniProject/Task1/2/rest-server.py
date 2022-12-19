@@ -13,9 +13,14 @@ import zmq  # For ZMQ
 from flask import Flask, make_response, g, request, send_file
 
 import hdfs
+import raid1
 from utils import is_raspberry_pi, is_docker
 
 import json
+
+
+RAID1 = 'raid1'
+HDFS = 'hdfs'
 
 
 def get_db():
@@ -38,6 +43,18 @@ def close_db(e=None):
 
 # Initiate ZMQ sockets
 context = zmq.Context()
+
+# Socket to send tasks to Storage Nodes
+send_task_socket = context.socket(zmq.PUSH)
+send_task_socket.bind("tcp://*:5557")
+
+# Socket to receive messages from Storage Nodes
+response_socket = context.socket(zmq.PULL)
+response_socket.bind("tcp://*:5558")
+
+# Publisher socket for data request broadcasts
+data_req_socket = context.socket(zmq.PUB)
+data_req_socket.bind("tcp://*:5559")
 
 n_replicas_k = data_folder = sys.argv[1] if len(sys.argv) > 1 else 3
 
@@ -89,7 +106,13 @@ def download_file(file_id):
     # Parse the storage details JSON string
     storage_details = json.loads(f['storage_details'])
 
-    file_data = hdfs.get_file(storage_details, context)
+    if f['storage_mode'] == RAID1:
+        # Get file using Raid1
+        file_data = raid1.get_file(storage_details, data_req_socket, response_socket)
+
+    elif f['storage_details'] == HDFS:
+        # Get file using HDFS-like
+        file_data = hdfs.get_file(storage_details, context)
 
     return send_file(io.BytesIO(file_data), mimetype=f['content_type'])
 
@@ -159,10 +182,16 @@ def add_files_multipart():
     logging.info("File received: %s, size: %d bytes, type: %s" % (filename, size, content_type))
 
     # Read the requested storage mode from the form (default value: 'raid1')
-    storage_mode = payload.get('storage', 'raid1')
+    storage_mode = payload.get('storage', RAID1)
     logging.info("Storage mode: %s" % storage_mode)
 
-    storage_details = hdfs.store_file(data, n_replicas_k, context)
+    if storage_mode == RAID1:
+        # Raid1 using k replicas
+        storage_details = raid1.store_file(data, n_replicas_k, send_task_socket, response_socket)
+
+    elif storage_mode == HDFS:
+        # HDFS-like, using delegation
+        storage_details = hdfs.store_file(data, n_replicas_k, context)
 
     # Insert the File record in the DB
     db = get_db()
