@@ -16,7 +16,6 @@ import time # For waiting a second for ZMQ connections
 import math # For cutting the file in half
 import messages_pb2 # Generated Protobuf messages
 import io # For sending binary data in a HTTP response
-import logging
 
 import raid1
 import reedsolomon
@@ -74,6 +73,11 @@ print("Listening to ZMQ messages on tcp://*:5558 and tcp://*:5561")
 
 # Instantiate the Flask app (must be before the endpoint functions)
 app = Flask(__name__)
+
+# Stop Flask from logging
+log = logging.getLogger('werkzeug')
+log.setLevel(logging.ERROR)
+
 # Close the DB connection after serving the request
 app.teardown_appcontext(close_db)
 
