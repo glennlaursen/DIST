@@ -27,6 +27,7 @@ enum request_type
     FRAGMENT_STATUS_REQ = 0;
     FRAGMENT_DATA_REQ = 1;
     STORE_FRAGMENT_DATA_REQ = 2;
+    HEARTBEAT_REQ = 3;
 }
 
 // This message is sent in the first frame of the request,
@@ -36,5 +37,12 @@ message header
     request_type request_type = 1;
 }
 
+message heartbeat_request
+{
+    string node_ip = 1;
+}
 
-
+message heartbeat_response {
+    string node_id = 1;
+    repeated string fragments = 2;
+}

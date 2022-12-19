@@ -1,7 +1,12 @@
+from time import sleep
+
 import kodo
 import math
 import random
 import copy # for deepcopy
+
+import zmq
+
 from utils import random_string
 import messages_pb2
 import json
@@ -107,7 +112,7 @@ def decode_file(symbols):
 
 
 def get_file(coded_fragments, max_erasures, file_size,
-             data_req_socket, response_socket):
+             data_req_socket, heartbeat_req_socket, response_socket):
     """
     Implements retrieving a file that is stored with Reed Solomon erasure coding
 
@@ -118,13 +123,33 @@ def get_file(coded_fragments, max_erasures, file_size,
     :param response_socket: A ZMQ PULL socket where the storage nodes respond.
     :return: A list of the random generated chunk names, e.g. (c1,c2), (c3,c4)
     """
-    
-    # We need 4-max_erasures fragments to reconstruct the file, select this many 
-    # by randomly removing 'max_erasures' elements from the given chunk names. 
+    nodes_needed = STORAGE_NODES_NUM-max_erasures
     fragnames = copy.deepcopy(coded_fragments)
-    for i in range(max_erasures):
-        fragnames.remove(random.choice(fragnames))
-    
+    connected_nodes = check_nodes(heartbeat_req_socket, response_socket)
+
+    # if > max_erasures nodes are dead
+    if len(connected_nodes) < nodes_needed:
+        msg = "Not enough nodes online to fetch file"
+        print(msg)
+        return msg
+    # if <= max_erasures nodes are dead
+    elif len(connected_nodes) >= nodes_needed:
+        # Get list of all frags located on live nodes
+        all_frags = [item for sublist in connected_nodes.values() for item in sublist]
+
+        # Copy of fragnames to loop over since we have to clear fragnames
+        new_fragnames = copy.deepcopy(fragnames)
+
+        # New list of needed fragments found on live nodes only
+        fragnames.clear()
+        fragnames = [frag for frag in new_fragnames if frag in all_frags]
+
+        # If there are more fragments than needed, remove the excess
+        if len(fragnames) > nodes_needed:
+            to_remove = len(fragnames) - nodes_needed
+            for i in range(to_remove):
+                fragnames.remove(random.choice(fragnames))
+
     # Request the coded fragments in parallel
     for name in fragnames:
         task = messages_pb2.getdata_request()
@@ -140,7 +165,7 @@ def get_file(coded_fragments, max_erasures, file_size,
         # In this case we don't care about the received name, just use the 
         # data from the second frame
         symbols.append({
-            "chunkname": result[0].decode('utf-8'), 
+            "chunkname": result[0].decode('utf-8'),
             "data": bytearray(result[1])
         })
     print("All coded fragments received successfully")
@@ -149,7 +174,6 @@ def get_file(coded_fragments, max_erasures, file_size,
     file_data = decode_file(symbols)
 
     return file_data[:file_size]
-#
 
 
 def get_file_for_repair(fragments_to_retrieve, file_size,
@@ -192,7 +216,24 @@ def get_file_for_repair(fragments_to_retrieve, file_size,
     file_data = decode_file(symbols)
 
     return file_data[:file_size]# Reconstruct the original data with a decoder
-#
+
+
+def check_nodes(heartbeat_request_socket, response_socket):
+    connected_nodes = {}
+
+    task = messages_pb2.heartbeat_request()
+    heartbeat_request_socket.send_multipart([b"all_nodes", task.SerializeToString()])
+
+    # Check to see which nodes are alive
+    for i in range(STORAGE_NODES_NUM):
+        if response_socket.poll(500, zmq.POLLIN):
+            msg = response_socket.recv()
+            response = messages_pb2.heartbeat_response()
+            response.ParseFromString(msg)
+            connected_nodes[response.node_id] = response.fragments
+            #print("Node alive:", response.node_id)
+
+    return connected_nodes
 
 
 def start_repair_process(files, repair_socket, repair_response_socket):
