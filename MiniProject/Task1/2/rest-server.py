@@ -56,11 +56,11 @@ response_socket.bind("tcp://*:5558")
 data_req_socket = context.socket(zmq.PUB)
 data_req_socket.bind("tcp://*:5559")
 
-n_replicas_k = data_folder = sys.argv[1] if len(sys.argv) > 1 else 3
+n_replicas_k = data_folder = int(sys.argv[1]) if len(sys.argv) > 1 else 3
 
 # Wait for all workers to start and connect. 
 time.sleep(1)
-logging.info("Listening to ZMQ messages on tcp://*:5558 and tcp://*:5561")
+print("Listening to ZMQ messages on tcp://*:5558 and tcp://*:5561")
 
 # Instantiate the Flask app (must be before the endpoint functions)
 app = Flask(__name__)
@@ -101,7 +101,7 @@ def download_file(file_id):
 
     # Convert to a Python dictionary
     f = dict(f)
-    logging.info("File requested: {}".format(f['filename']))
+    print("File requested: {}".format(f['filename']))
 
     # Parse the storage details JSON string
     storage_details = json.loads(f['storage_details'])
@@ -132,7 +132,7 @@ def get_file_metadata(file_id):
 
     # Convert to a Python dictionary
     f = dict(f)
-    logging.info("File: %s" % f)
+    print("File: %s" % f)
 
     return make_response(f)
 
@@ -150,7 +150,7 @@ def delete_file(file_id):
 
     # Convert to a Python dictionary
     f = dict(f)
-    logging.info("File to delete: %s" % f)
+    print("File to delete: %s" % f)
 
     # TODO Delete all chunks from the Storage Nodes
 
@@ -168,7 +168,7 @@ def add_files_multipart():
 
     # Make sure there is a file in the request
     if not files or not files.get('file'):
-        logging.error("No file was uploaded in the request!")
+        print("No file was uploaded in the request!")
         return make_response("File missing!", 400)
 
     # Reference to the file under 'file' key
@@ -179,11 +179,11 @@ def add_files_multipart():
     # Load the file contents into a bytearray and measure its size
     data = bytearray(file.read())
     size = len(data)
-    logging.info("File received: %s, size: %d bytes, type: %s" % (filename, size, content_type))
+    print("File received: %s, size: %d bytes, type: %s" % (filename, size, content_type))
 
     # Read the requested storage mode from the form (default value: 'raid1')
     storage_mode = payload.get('storage', RAID1)
-    logging.info("Storage mode: %s" % storage_mode)
+    print("Storage mode: %s" % storage_mode)
 
     if storage_mode == RAID1:
         # Raid1 using k replicas
@@ -201,7 +201,7 @@ def add_files_multipart():
     )
     db.commit()
 
-    logging.info('Storage details: (filename: ' + filename + ', size: ' + str(size) + ', content_type: ' + content_type
+    print('Storage details: (filename: ' + filename + ', size: ' + str(size) + ', content_type: ' + content_type
           + ', storage_mode: ' + storage_mode + ', storage_details: ' + json.dumps(storage_details))
 
     return make_response({"id": cursor.lastrowid}, 201)
