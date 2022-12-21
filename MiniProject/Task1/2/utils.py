@@ -66,18 +66,18 @@ def get_k_node_ips(k: int):
         return random.sample(node_ips, k)
 
 
-def check_node_online(node_ip: str, status_socket: zmq.Socket):
-    addr = 'tcp://' + node_ip + ':6666'
-    status_socket.connect(addr)
-    status_socket.send_string('are you online?')
+def check_node_online(node_ip: str, context: zmq.Context):
+    sender = context.socket(zmq.REQ)
+    sender.connect('tcp://' + node_ip + ':6666')
+    sender.send_string('are you online?')
 
     # Check that node is online
-    if (status_socket.poll(1000) & zmq.POLLIN) != 0:
-        resp = status_socket.recv_string()
+    if (sender.poll(1000) & zmq.POLLIN) != 0:
+        resp = sender.recv_string()
         print(node_ip + ' says: ' + resp)
-        status_socket.disconnect(addr)
+        sender.close()
         return True
     else:
         print(node_ip + ' is offline :(')
-        status_socket.disconnect(addr)
+        sender.close()
         return False

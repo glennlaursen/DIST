@@ -56,8 +56,6 @@ response_socket.bind("tcp://*:5558")
 data_req_socket = context.socket(zmq.PUB)
 data_req_socket.bind("tcp://*:5559")
 
-status_socket = context.socket(zmq.REQ)
-
 n_replicas_k = data_folder = int(sys.argv[1]) if len(sys.argv) > 1 else 3
 
 # Wait for all workers to start and connect. 
@@ -110,11 +108,11 @@ def download_file(file_id):
 
     if f['storage_mode'] == RAID1:
         # Get file using Raid1
-        file_data = raid1.get_file_2(storage_details, data_req_socket, response_socket, status_socket)
+        file_data = raid1.get_file_2(storage_details, data_req_socket, response_socket, context)
 
     elif f['storage_mode'] == HDFS:
         # Get file using HDFS-like
-        file_data = hdfs.get_file(storage_details, status_socket, context)
+        file_data = hdfs.get_file(storage_details, context)
 
     return send_file(io.BytesIO(file_data), mimetype=f['content_type'])
 
