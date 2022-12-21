@@ -190,6 +190,7 @@ while True:
         find_and_send_file(raid1_data_req_socket, sender)
 
     if status_socket in socks:
+        req = status_socket.recv_string()
         status_socket.send_string("OK")
 
     else:
