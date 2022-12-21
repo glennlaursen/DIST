@@ -159,7 +159,7 @@ while True:
 
     if raid1_receive_socket in socks:
         # Incoming message on the 'receiver' socket where we get tasks to store a file
-        msg = hdfs_receive_socket.recv_multipart()
+        msg = raid1_receive_socket.recv_multipart()
         # Parse the Protobuf message from the first frame
         task = messages_pb2.storedata_request()
         task.ParseFromString(msg[0])
