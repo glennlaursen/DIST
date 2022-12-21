@@ -32,6 +32,7 @@ def store_file(file_data: bytearray, k: int, send_task_socket: zmq.Socket, respo
     for name in file_data_names:
         task = messages_pb2.storedata_request()
         task.filename = name
+        task.replica_locations[:] = []
         send_task_socket.send_multipart([
             task.SerializeToString(),
             file_data
