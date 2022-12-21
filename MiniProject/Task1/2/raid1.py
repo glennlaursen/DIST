@@ -26,7 +26,7 @@ def store_file(file_data: bytearray, k: int, send_task_socket: zmq.Socket, respo
 
     # Generate k random filenames
     file_data_names = [random_string() for _ in range(k)]
-    logging.info("Filenames for file: %s" % file_data_names)
+    print("Filenames for file: %s" % file_data_names)
 
     # Send k 'store data' Protobuf requests with the file and filename
     for name in file_data_names:
@@ -41,7 +41,7 @@ def store_file(file_data: bytearray, k: int, send_task_socket: zmq.Socket, respo
     # Wait until we receive k responses from the workers
     for task_nbr in range(k):
         resp = response_socket.recv_string()
-        logging.info('Received: %s' % resp)
+        print('Received: %s' % resp)
 
     storage_details = {
         "filenames": file_data_names,
@@ -78,9 +78,9 @@ def get_file(storage_details, data_req_socket: zmq.Socket, response_socket: zmq.
             # Second frame: data
             file_data = result[1]
 
-            logging.info("Received %s" % filename_received)
+            print("Received %s" % filename_received)
 
             return file_data
         else:
-            logging.warning('Location that stores file: ' + filename + ', is offline :(')
+            print('Location that stores file: ' + filename + ', is offline :(')
             continue
