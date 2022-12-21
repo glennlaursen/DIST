@@ -128,7 +128,7 @@ def get_file(storage_details, data_req_socket: zmq.Socket, response_socket: zmq.
             continue
 
 
-def get_file_2(storage_details, data_req_socket: zmq.Socket, response_socket: zmq.Socket, context: zmq.Context):
+def get_file_2(storage_details, data_req_socket: zmq.Socket, response_socket: zmq.Socket, status_socket: zmq.Socket):
     """
     Implements retrieving a file that is stored with RAID 1 using 4 storage nodes.
 
@@ -140,7 +140,7 @@ def get_file_2(storage_details, data_req_socket: zmq.Socket, response_socket: zm
 
     # Try each filename one by one, until the file is successfully received.
     for filename, ip in storage_details['filenames_and_locations'].items():
-        if not utils.check_node_online(ip, context):
+        if not utils.check_node_online(ip, status_socket):
             continue
 
         task = messages_pb2.getdata_request()

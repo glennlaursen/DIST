@@ -64,7 +64,7 @@ def store_file(file_data: bytearray, k: int, context: zmq.Context):
     return storage_details
 
 
-def get_file(storage_details, context: zmq.Context):
+def get_file(storage_details, status_socket: zmq.Socket, context: zmq.Context):
     """
     Implements retrieving a file that is stored with RAID 1 using 4 storage nodes.
 
@@ -82,7 +82,7 @@ def get_file(storage_details, context: zmq.Context):
     # Try the replica locations, one by one, to find an online node.
     for location in replica_locations:
 
-        if not utils.check_node_online(location, context):
+        if not utils.check_node_online(location, status_socket):
             continue
 
         hdfs_data_req_socket = context.socket(zmq.REQ)
