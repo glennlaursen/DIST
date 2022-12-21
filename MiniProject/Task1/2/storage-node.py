@@ -157,6 +157,25 @@ while True:
     if hdfs_data_req_socket in socks:
         find_and_send_file(hdfs_data_req_socket, hdfs_data_req_socket)
 
+    if raid1_receive_socket in socks:
+        # Incoming message on the 'receiver' socket where we get tasks to store a file
+        msg = hdfs_receive_socket.recv_multipart()
+        # Parse the Protobuf message from the first frame
+        task = messages_pb2.storedata_request()
+        task.ParseFromString(msg[0])
+
+        # The data is the second frame
+        data = msg[1]
+
+        filename = task.filename
+        print('File to save: %s, size: %d bytes' % (filename, len(data)))
+
+        # Store the chunk with the given filename
+        chunk_local_path = data_folder + '/' + filename
+        write_file(data, chunk_local_path)
+        print("File saved to %s" % chunk_local_path)
+        # Send response (just the file name)
+        sender.send_string(task.filename)
 
     if raid1_data_req_socket in socks:
         find_and_send_file(raid1_data_req_socket, sender)
