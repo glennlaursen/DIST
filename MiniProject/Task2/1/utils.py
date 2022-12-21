@@ -2,6 +2,10 @@ import random
 import string
 import platform
 
+import messages_pb2
+import zmq
+
+
 def random_string(length=8):
     """
     Returns a random alphanumeric string of the given length. 
@@ -11,7 +15,7 @@ def random_string(length=8):
     :return: The random generated string
     """
     return ''.join([random.SystemRandom().choice(string.ascii_letters + string.digits) for n in range(length)])
-#
+
 
 def write_file(data, filename=None):
     """
@@ -26,23 +30,22 @@ def write_file(data, filename=None):
         filename = random_string(8)
         # Add '.bin' extension
         filename += ".bin"
-    
+
     try:
         # Open filename for writing binary content ('wb')
         # note: when a file is opened using the 'with' statment, 
         # it is closed automatically when the scope ends
-        with open('./'+filename, 'wb') as f:
+        with open('./' + filename, 'wb') as f:
             f.write(data)
     except EnvironmentError as e:
         print("Error writing file: {}".format(e))
         return None
-    
+
     return filename
-#
+
 
 def is_raspberry_pi():
     """
     Returns True if the current platform is a Raspberry Pi, otherwise False.
     """
     return platform.uname().node == 'raspberrypi'
-#

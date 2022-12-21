@@ -1,10 +1,42 @@
+import time
+from time import sleep
+
 import kodo
 import math
 import random
-import copy # for deepcopy
+import copy  # for deepcopy
+
+import zmq
+
 from utils import random_string
 import messages_pb2
 import json
+
+import logging
+
+# Create custom loggers
+f_format = logging.Formatter('%(message)s')
+
+logger_encoding = logging.getLogger("rs_encoding")
+logger_encoding.setLevel(logging.DEBUG)
+f_handler = logging.FileHandler('log_rs_en.log')
+f_handler.setFormatter(f_format)
+logger_encoding.addHandler(f_handler)
+
+logger_decoding = logging.getLogger("rs_decoding")
+logger_decoding.setLevel(logging.DEBUG)
+f_handler = logging.FileHandler('log_rs_de.log')
+f_handler.setFormatter(f_format)
+logger_decoding.addHandler(f_handler)
+
+logger_storing = logging.getLogger("rs_storing")
+logger_storing.setLevel(logging.DEBUG)
+f_handler = logging.FileHandler('log_rs_st.log')
+f_handler.setFormatter(f_format)
+logger_storing.addHandler(f_handler)
+
+#logger_encoding.info("File Size, Max Erasures, Encoding Time")
+#logger_decoding.info("File Size, Decoding Time")
 
 STORAGE_NODES_NUM = 4
 
@@ -14,6 +46,7 @@ RS_CAUCHY_COEFFS = [
     bytearray([255, 127, 253, 126]),
     bytearray([127, 255, 126, 253])
 ]
+
 
 def store_file(file_data, max_erasures, send_task_socket, response_socket):
     """
@@ -28,15 +61,16 @@ def store_file(file_data, max_erasures, send_task_socket, response_socket):
     :param response_socket: A ZMQ PULL socket where the storage nodes respond
     :return: A list of the coded fragment names, e.g. (c1,c2,c3,c4)
     """
+    t1_full = time.perf_counter()
 
     # Make sure we can realize max_erasures with 4 storage nodes
-    assert(max_erasures >= 0)
-    assert(max_erasures < STORAGE_NODES_NUM)
+    assert (max_erasures >= 0)
+    assert (max_erasures < STORAGE_NODES_NUM)
 
     # How many coded fragments (=symbols) will be required to reconstruct the encoded data. 
     symbols = STORAGE_NODES_NUM - max_erasures
     # The size of one coded fragment (total size/number of symbols, rounded up)
-    symbol_size = math.ceil(len(file_data)/symbols)
+    symbol_size = math.ceil(len(file_data) / symbols)
     # Kodo RLNC encoder using 2^8 finite field
     encoder = kodo.block.Encoder(kodo.FiniteField.binary8)
     encoder.configure(symbols, symbol_size)
@@ -44,6 +78,8 @@ def store_file(file_data, max_erasures, send_task_socket, response_socket):
     symbol = bytearray(encoder.symbol_bytes)
 
     fragment_names = []
+
+    t1 = time.perf_counter()
 
     # Generate one coded fragment for each Storage Node
     for i in range(STORAGE_NODES_NUM):
@@ -55,7 +91,7 @@ def store_file(file_data, max_erasures, send_task_socket, response_socket):
         # Generate a random name for it and save
         name = random_string(8)
         fragment_names.append(name)
-        
+
         # Send a Protobuf STORE DATA request to the Storage Nodes
         task = messages_pb2.storedata_request()
         task.filename = name
@@ -64,13 +100,24 @@ def store_file(file_data, max_erasures, send_task_socket, response_socket):
             task.SerializeToString(),
             coefficients[:symbols] + bytearray(symbol)
         ])
-    
+
+    t2 = time.perf_counter()
+    dur = t2-t1
+
+    logger_encoding.info(str(len(file_data)) + ", " + str(max_erasures) + ", " + str(dur))
+
     # Wait until we receive a response for every fragment
     for task_nbr in range(STORAGE_NODES_NUM):
         resp = response_socket.recv_string()
         print('Received: %s' % resp)
 
+    t2_full = time.perf_counter()
+    dur_full = t2_full-t1_full
+    logger_storing.info(str(len(file_data)) + ", " + str(max_erasures) + ", " + str(dur_full))
+
     return fragment_names
+
+
 #
 
 
@@ -82,10 +129,11 @@ def decode_file(symbols):
     :param symbols: coded symbols that contain both the coefficients and symbol data
     :return: the decoded file data
     """
+    t1 = time.perf_counter()
 
     # Reconstruct the original data with a decoder
     symbols_num = len(symbols)
-    symbol_size = len(symbols[0]['data']) - symbols_num #subtract the coefficients' size
+    symbol_size = len(symbols[0]['data']) - symbols_num  # subtract the coefficients' size
     decoder = kodo.block.Decoder(kodo.FiniteField.binary8)
     decoder.configure(symbols_num, symbol_size)
     data_out = bytearray(decoder.block_bytes)
@@ -99,15 +147,22 @@ def decode_file(symbols):
         decoder.decode_symbol(symbol_data, coefficients)
 
     # Make sure the decoder successfully reconstructed the file
-    assert(decoder.is_complete())
+    assert (decoder.is_complete())
+
+    t2 = time.perf_counter()
+    dur = t2-t1
+    logger_decoding.info(str(len(data_out)) + ", " + str(dur))
+
     print("File decoded successfully")
 
     return data_out
+
+
 #
 
 
 def get_file(coded_fragments, max_erasures, file_size,
-             data_req_socket, response_socket):
+             data_req_socket, heartbeat_req_socket, response_socket):
     """
     Implements retrieving a file that is stored with Reed Solomon erasure coding
 
@@ -118,20 +173,40 @@ def get_file(coded_fragments, max_erasures, file_size,
     :param response_socket: A ZMQ PULL socket where the storage nodes respond.
     :return: A list of the random generated chunk names, e.g. (c1,c2), (c3,c4)
     """
-    
-    # We need 4-max_erasures fragments to reconstruct the file, select this many 
-    # by randomly removing 'max_erasures' elements from the given chunk names. 
+    nodes_needed = STORAGE_NODES_NUM - max_erasures
     fragnames = copy.deepcopy(coded_fragments)
-    for i in range(max_erasures):
-        fragnames.remove(random.choice(fragnames))
-    
+    connected_nodes = check_nodes(heartbeat_req_socket, response_socket)
+
+    # if > max_erasures nodes are dead
+    if len(connected_nodes) < nodes_needed:
+        msg = "Not enough nodes online to fetch file"
+        print(msg)
+        return msg
+    # if <= max_erasures nodes are dead
+    elif len(connected_nodes) >= nodes_needed:
+        # Get list of all frags located on live nodes
+        all_frags = [item for sublist in connected_nodes.values() for item in sublist]
+
+        # Copy of fragnames to loop over since we have to clear fragnames
+        new_fragnames = copy.deepcopy(fragnames)
+
+        # New list of needed fragments found on live nodes only
+        fragnames.clear()
+        fragnames = [frag for frag in new_fragnames if frag in all_frags]
+
+        # If there are more fragments than needed, remove the excess
+        if len(fragnames) > nodes_needed:
+            to_remove = len(fragnames) - nodes_needed
+            for i in range(to_remove):
+                fragnames.remove(random.choice(fragnames))
+
     # Request the coded fragments in parallel
     for name in fragnames:
         task = messages_pb2.getdata_request()
         task.filename = name
         data_req_socket.send(
             task.SerializeToString()
-            )
+        )
 
     # Receive all chunks and insert them into the symbols array
     symbols = []
@@ -140,16 +215,15 @@ def get_file(coded_fragments, max_erasures, file_size,
         # In this case we don't care about the received name, just use the 
         # data from the second frame
         symbols.append({
-            "chunkname": result[0].decode('utf-8'), 
+            "chunkname": result[0].decode('utf-8'),
             "data": bytearray(result[1])
         })
     print("All coded fragments received successfully")
 
-    #Reconstruct the original file data
+    # Reconstruct the original file data
     file_data = decode_file(symbols)
 
     return file_data[:file_size]
-#
 
 
 def get_file_for_repair(fragments_to_retrieve, file_size,
@@ -165,7 +239,7 @@ def get_file_for_repair(fragments_to_retrieve, file_size,
     :param response_socket: A ZMQ PULL socket where the storage nodes respond.
     :return: A list of the random generated chunk names, e.g. (c1,c2), (c3,c4)
     """
-    
+
     # Request the coded fragments in parallel.
     for name in fragments_to_retrieve:
         task = messages_pb2.getdata_request()
@@ -183,16 +257,33 @@ def get_file_for_repair(fragments_to_retrieve, file_size,
         # In this case we don't care about the received name, just use the 
         # data from the second frame
         symbols.append({
-            "chunkname": result[0].decode('utf-8'), 
+            "chunkname": result[0].decode('utf-8'),
             "data": bytearray(result[1])
         })
     print(str(len(fragments_to_retrieve)) + " coded fragments received successfully")
 
-    #Reconstruct the original file data
+    # Reconstruct the original file data
     file_data = decode_file(symbols)
 
-    return file_data[:file_size]# Reconstruct the original data with a decoder
-#
+    return file_data[:file_size]  # Reconstruct the original data with a decoder
+
+
+def check_nodes(heartbeat_request_socket, response_socket):
+    connected_nodes = {}
+
+    task = messages_pb2.heartbeat_request()
+    heartbeat_request_socket.send_multipart([b"all_nodes", task.SerializeToString()])
+
+    # Check to see which nodes are alive
+    for i in range(STORAGE_NODES_NUM):
+        if response_socket.poll(500, zmq.POLLIN):
+            msg = response_socket.recv()
+            response = messages_pb2.heartbeat_response()
+            response.ParseFromString(msg)
+            connected_nodes[response.node_id] = response.fragments
+            # print("Node alive:", response.node_id)
+
+    return connected_nodes
 
 
 def start_repair_process(files, repair_socket, repair_response_socket):
@@ -214,18 +305,18 @@ def start_repair_process(files, repair_socket, repair_response_socket):
     number_of_missing_fragments = 0
     number_of_repaired_fragments = 0
 
-    #Check that each file is actually stored on the storage nodes
+    # Check that each file is actually stored on the storage nodes
     for file in files:
         print("Checking file with id: %s" % file["id"])
-        #We parse the JSON into a python dictionary
+        # We parse the JSON into a python dictionary
         storage_details = json.loads(file["storage_details"])
 
-        #Iterate over each coded fragment to check that it is not missing
-        nodes = set() # list of all storage nodes
-        nodes_with_fragment = set() # list of storage nodes with fragments
-        coded_fragments = storage_details["coded_fragments"] # list of all coded fragments
-        missing_fragments = [] # list of missing coded fragments
-        existing_fragments = [] # list of existing coded fragments
+        # Iterate over each coded fragment to check that it is not missing
+        nodes = set()  # list of all storage nodes
+        nodes_with_fragment = set()  # list of storage nodes with fragments
+        coded_fragments = storage_details["coded_fragments"]  # list of all coded fragments
+        missing_fragments = []  # list of missing coded fragments
+        existing_fragments = []  # list of existing coded fragments
         for fragment in coded_fragments:
             task = messages_pb2.fragment_status_request()
             task.fragment_name = fragment
@@ -242,8 +333,8 @@ def start_repair_process(files, repair_socket, repair_response_socket):
                 msg = repair_response_socket.recv()
                 response = messages_pb2.fragment_status_response()
                 response.ParseFromString(msg)
-                
-                nodes.add(response.node_id) #Build a set of nodes
+
+                nodes.add(response.node_id)  # Build a set of nodes
                 if response.is_present == True:
                     nodes_with_fragment.add(response.node_id)
                     existing_fragments.append(fragment)
@@ -260,7 +351,6 @@ def start_repair_process(files, repair_socket, repair_response_socket):
         # We assume that each node has exactly 1 or 0 fragments
         nodes_without_fragment = list(nodes.difference(nodes_with_fragment))
 
-
         # Perform the actual repair, if necessary
         if len(missing_fragments) > 0:
             # Check that enough fragments still remain to be able to repair
@@ -270,17 +360,17 @@ def start_repair_process(files, repair_socket, repair_response_socket):
 
             # Retrieve sufficient fragments and decode
             symbols = STORAGE_NODES_NUM - storage_details["max_erasures"]
-            file_data = get_file_for_repair(existing_fragments[:symbols], # only as many as necessary
+            file_data = get_file_for_repair(existing_fragments[:symbols],  # only as many as necessary
                                             file["size"],
                                             repair_socket,
                                             repair_response_socket
-            )
+                                            )
 
-            #Build the encoder
+            # Build the encoder
             # How many coded fragments (=symbols) will be required to reconstruct the encoded data. 
             symbols = STORAGE_NODES_NUM - storage_details["max_erasures"]
             # The size of one coded fragment (total size/number of symbols, rounded up)
-            symbol_size = math.ceil(len(file_data)/symbols)
+            symbol_size = math.ceil(len(file_data) / symbols)
             # Kodo RLNC encoder using 2^8 finite field
             encoder = kodo.block.Encoder(kodo.FiniteField.binary8)
             encoder.configure(symbols, symbol_size)
@@ -306,18 +396,17 @@ def start_repair_process(files, repair_socket, repair_response_socket):
 
                 node_id = nodes_without_fragment[number_of_repaired_fragments]
 
-                #Use the node_id as the topic
+                # Use the node_id as the topic
                 repair_socket.send_multipart([node_id.encode('UTF-8'),
                                               header.SerializeToString(),
                                               task.SerializeToString(),
                                               coefficients[:symbols] + bytearray(symbol)
-                ])
+                                              ])
                 number_of_repaired_fragments += 1
 
             # Wait until we receive a response for every fragment
             for task_nbr in range(len(missing_fragments)):
                 resp = repair_response_socket.recv_string()
                 print('Repaired fragment: %s' % resp)
-
 
     return number_of_missing_fragments, number_of_repaired_fragments
