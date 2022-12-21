@@ -2,7 +2,7 @@ import platform
 import random
 import string
 
-node_ips = ['192.168.38.10' + i for i in ["1", "2", "3", "4"]]
+node_ips = ['192.168.0.10' + i for i in ["1", "2", "3", "4"]]
 node_names_for_docker = ['node' + i for i in ["1", "2", "3", "4"]]
 
 

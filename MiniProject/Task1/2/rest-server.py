@@ -182,7 +182,7 @@ def add_files_multipart():
     print("File received: %s, size: %d bytes, type: %s" % (filename, size, content_type))
 
     # Read the requested storage mode from the form (default value: 'raid1')
-    storage_mode = payload.get('storage', RAID1)
+    storage_mode = payload.get('storage', RAID1, type=str)
     print("Storage mode: %s" % storage_mode)
 
     if storage_mode == RAID1:
