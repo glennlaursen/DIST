@@ -110,7 +110,7 @@ def download_file(file_id):
         # Get file using Raid1
         file_data = raid1.get_file(storage_details, data_req_socket, response_socket)
 
-    elif f['storage_details'] == HDFS:
+    elif f['storage_mode'] == HDFS:
         # Get file using HDFS-like
         file_data = hdfs.get_file(storage_details, context)
 
