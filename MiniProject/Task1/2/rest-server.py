@@ -108,7 +108,7 @@ def download_file(file_id):
 
     if f['storage_mode'] == RAID1:
         # Get file using Raid1
-        file_data = raid1.get_file(storage_details, data_req_socket, response_socket)
+        file_data = raid1.get_file_2(storage_details, data_req_socket, response_socket, context)
 
     elif f['storage_mode'] == HDFS:
         # Get file using HDFS-like
@@ -187,7 +187,7 @@ def add_files_multipart():
 
     if storage_mode == RAID1:
         # Raid1 using k replicas
-        storage_details = raid1.store_file(data, n_replicas_k, send_task_socket, response_socket)
+        storage_details = raid1.store_file_2(data, n_replicas_k, send_task_socket, response_socket)
 
     elif storage_mode == HDFS:
         # HDFS-like, using delegation

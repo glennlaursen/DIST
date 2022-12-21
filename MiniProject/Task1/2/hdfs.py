@@ -81,27 +81,24 @@ def get_file(storage_details, context: zmq.Context):
 
     # Try the replica locations, one by one, to find an online node.
     for location in replica_locations:
+
+        if not utils.check_node_online(location, context):
+            continue
+
         hdfs_data_req_socket = context.socket(zmq.REQ)
         hdfs_data_req_socket.connect('tcp://' + location + ':5561')
         hdfs_data_req_socket.send(task.SerializeToString())
         print('Trying to get file from: ' + location)
 
-        # Check that node is online
-        if (hdfs_data_req_socket.poll(REQUEST_TIMEOUT) & zmq.POLLIN) != 0:
-            # Receive file
-            result = hdfs_data_req_socket.recv_multipart()
-            # First frame: file name (string)
-            filename_received = result[0].decode('utf-8')
-            # Second frame: data
-            file_data = result[1]
+        # Receive file
+        result = hdfs_data_req_socket.recv_multipart()
+        # First frame: file name (string)
+        filename_received = result[0].decode('utf-8')
+        # Second frame: data
+        file_data = result[1]
 
-            print("Received %s" % filename_received)
+        print("Received %s" % filename_received)
 
-            hdfs_data_req_socket.close()
+        hdfs_data_req_socket.close()
 
-            return file_data
-        else:
-            # Location is offline, try next one
-            print(location + ' is offline :(')
-            hdfs_data_req_socket.close()
-            continue
+        return file_data

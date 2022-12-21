@@ -4,6 +4,7 @@ Aarhus University - Distributed Storage course - Lab 7
 Storage Node
 """
 import os
+import socket
 import sys
 import logging
 import zmq
@@ -74,6 +75,9 @@ else:
     push_address = "tcp://localhost:5558"
     subscriber_address = "tcp://localhost:5559"
 
+# https://stackoverflow.com/questions/166506/finding-local-ip-addresses-using-pythons-stdlib
+own_ip = (([ip for ip in socket.gethostbyname_ex(socket.gethostname())[2] if not ip.startswith("127.")] or [[(s.connect(("8.8.8.8", 53)), s.getsockname()[0], s.close()) for s in [socket.socket(socket.AF_INET, socket.SOCK_DGRAM)]][0][1]]) + ["no IP found"])[0]
+
 context = zmq.Context()
 
 # Socket to receive Store file messages from the controller
@@ -98,12 +102,17 @@ hdfs_receive_socket.bind("tcp://*:5560")
 hdfs_data_req_socket = context.socket(zmq.REP)
 hdfs_data_req_socket.bind("tcp://*:5561")
 
+# Status socket:
+status_socket = context.socket(zmq.REP)
+status_socket.bind("tcp://*:6666")
+
 # Use a Poller to monitor three sockets at the same time
 poller = zmq.Poller()
 poller.register(raid1_receive_socket, zmq.POLLIN)
 poller.register(raid1_data_req_socket, zmq.POLLIN)
 poller.register(hdfs_receive_socket, zmq.POLLIN)
 poller.register(hdfs_data_req_socket, zmq.POLLIN)
+poller.register(status_socket, zmq.POLLIN)
 
 while True:
     try:
@@ -174,11 +183,14 @@ while True:
         chunk_local_path = data_folder + '/' + filename
         write_file(data, chunk_local_path)
         print("File saved to %s" % chunk_local_path)
-        # Send response (just the file name)
-        sender.send_string(task.filename)
+        # Send response (filename + ip)
+        sender.send_pyobj({'filename': task.filename, 'ip': own_ip})
 
     if raid1_data_req_socket in socks:
         find_and_send_file(raid1_data_req_socket, sender)
+
+    if status_socket in socks:
+        status_socket.send_string("OK")
 
     else:
         print("Message type not supported")

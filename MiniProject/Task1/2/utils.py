@@ -2,6 +2,8 @@ import platform
 import random
 import string
 
+import zmq
+
 node_ips = ['192.168.0.10' + i for i in ["1", "2", "3", "4"]]
 node_names_for_docker = ['node' + i for i in ["1", "2", "3", "4"]]
 
@@ -62,3 +64,20 @@ def get_k_node_ips(k: int):
         return random.sample(node_names_for_docker, k)
     else:
         return random.sample(node_ips, k)
+
+
+def check_node_online(node_ip: str, context: zmq.Context):
+    sender = context.socket(zmq.REQ)
+    sender.connect('tcp://' + node_ip + ':6666')
+    sender.send_string('are you online?')
+
+    # Check that node is online
+    if (sender.poll(1000) & zmq.POLLIN) != 0:
+        resp = sender.recv_string()
+        print(node_ip + ' says: ' + resp)
+        sender.close()
+        return True
+    else:
+        print(node_ip + ' is offline :(')
+        sender.close()
+        return False
