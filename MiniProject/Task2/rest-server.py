@@ -20,7 +20,8 @@ import io # For sending binary data in a HTTP response
 import raid1
 import reedsolomon
 
-from utils import is_raspberry_pi
+from utils import is_raspberry_pi, is_docker
+
 
 def get_db():
     if 'db' not in g:
@@ -242,19 +243,46 @@ def add_files_multipart():
         # Parse max_erasures (everything is a string in request.form, 
         # we need to convert to int manually), set default value to 1
         max_erasures = int(payload.get('max_erasures', 1))
+        type = int(payload.get('type', 1))
 
         if max_erasures > 2:
-            return make_response('max_erasures cannot exceed 2, please try again', 404)
+            return make_response('max_erasures cannot exceed 2, please try again', 400)
         else:
+            fragment_names = None
+
             print("Max erasures: %d" % (max_erasures))
 
-            # Store the file contents with Reed Solomon erasure coding
-            fragment_names = reedsolomon.store_file(data, max_erasures, send_task_socket, response_socket)
+            if type == 1:
+                # Store the file contents with Reed Solomon erasure coding
+                fragment_names = reedsolomon.store_file(data, max_erasures, send_task_socket, response_socket)
+            elif type == 2:
+                # Delegate storage
+                _, ips = reedsolomon.check_nodes(heartbeat_socket, response_socket)
+                rand_ip = random.choice(ips)
+                print("Delegating to", rand_ip)
+                ips.remove(rand_ip)
 
-            storage_details = {
-                "coded_fragments": fragment_names,
-                "max_erasures": max_erasures
-            }
+                encode_socket = context.socket(zmq.REQ)
+                addr = "tcp://" + rand_ip + ':5542'
+                encode_socket.connect(addr)
+
+                encode_socket.send_pyobj({
+                    "data": data,
+                    "filename": filename,
+                    "ips": ips,
+                    "max_erasures": max_erasures
+                })
+
+                result = encode_socket.recv_pyobj()
+                fragment_names = result['names']
+
+            if fragment_names is not None:
+                storage_details = {
+                    "coded_fragments": fragment_names,
+                    "max_erasures": max_erasures
+                }
+            else:
+                return make_response("Something went wrong, try again", 400)
 
     else:
         logging.error("Unexpected storage mode: %s" % storage_mode)
@@ -263,11 +291,19 @@ def add_files_multipart():
     # Insert the File record in the DB
     import json
     db = get_db()
+    print(filename)
+    print(size)
+    print(content_type)
+    print(storage_mode)
+    print(storage_details)
+
     cursor = db.execute(
         "INSERT INTO `file`(`filename`, `size`, `content_type`, `storage_mode`, `storage_details`) VALUES (?,?,?,?,?)",
         (filename, size, content_type, storage_mode, json.dumps(storage_details))
     )
     db.commit()
+
+
 
     return make_response({"id": cursor.lastrowid }, 201)
 #
@@ -331,4 +367,4 @@ def server_error(e):
 # Start the Flask app (must be after the endpoint functions) 
 host_local_computer = "localhost" # Listen for connections on the local computer
 host_local_network = "0.0.0.0" # Listen for connections on the local network
-app.run(host=host_local_network if is_raspberry_pi() else host_local_computer, port=9000)
+app.run(host=host_local_network if is_raspberry_pi() or is_docker() else host_local_computer, port=9000)

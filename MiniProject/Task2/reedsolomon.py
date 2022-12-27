@@ -48,7 +48,88 @@ RS_CAUCHY_COEFFS = [
 ]
 
 
+def encode_file(file_data, max_erasures):
+    # Make sure we can realize max_erasures with 4 storage nodes
+    assert (max_erasures >= 0)
+    assert (max_erasures < STORAGE_NODES_NUM)
+
+    # How many coded fragments (=symbols) will be required to reconstruct the encoded data.
+    symbols = STORAGE_NODES_NUM - max_erasures
+    # The size of one coded fragment (total size/number of symbols, rounded up)
+    symbol_size = math.ceil(len(file_data) / symbols)
+    # Kodo RLNC encoder using 2^8 finite field
+    encoder = kodo.block.Encoder(kodo.FiniteField.binary8)
+    encoder.configure(symbols, symbol_size)
+    encoder.set_symbols_storage(file_data)
+    symbol = bytearray(encoder.symbol_bytes)
+
+    encoded_fragments = []
+
+    # Generate one coded fragment for each Storage Node
+    for i in range(STORAGE_NODES_NUM):
+        # Select the next Reed Solomon coefficient vector
+        coefficients = RS_CAUCHY_COEFFS[i]
+        # Generate a coded fragment with these coefficients
+        # (trim the coeffs to the actual length we need)
+        encoder.encode_symbol(symbol, coefficients[:symbols])
+
+        # Generate a random name for it and save
+        name = random_string(8)
+
+        encoded_fragments.append({"name": name, "data": coefficients[:symbols] + bytearray(symbol)})
+
+    return encoded_fragments
+
+
 def store_file(file_data, max_erasures, send_task_socket, response_socket):
+    """
+    Store a file using Reed Solomon erasure coding, protecting it against 'max_erasures'
+    unavailable storage nodes.
+    The erasure coding part codes are the customized version of the 'encode_decode_using_coefficients'
+    example of kodo-python, where you can find a detailed description of each step.
+
+    :param file_data: The file contents to be stored as a Python bytearray
+    :param max_erasures: How many storage node failures should the data survive
+    :param send_task_socket: A ZMQ PUSH socket to the storage nodes
+    :param response_socket: A ZMQ PULL socket where the storage nodes respond
+    :return: A list of the coded fragment names, e.g. (c1,c2,c3,c4)
+    """
+    t1_full = time.perf_counter()
+    t1 = time.perf_counter()
+
+    encoded_fragments = encode_file(file_data,max_erasures)
+    fragment_names = [f['name'] for f in encoded_fragments]
+
+    # Generate one coded fragment for each Storage Node
+    for fragment in encoded_fragments:
+
+        # Send a Protobuf STORE DATA request to the Storage Nodes
+        task = messages_pb2.storedata_request()
+        task.filename = fragment['name']
+
+        send_task_socket.send_multipart([
+            task.SerializeToString(),
+            fragment['data']
+        ])
+
+    t2 = time.perf_counter()
+    dur = t2-t1
+
+    logger_encoding.info(str(len(file_data)) + ", " + str(max_erasures) + ", " + str(dur))
+
+    # Wait until we receive a response for every fragment
+    for task_nbr in encoded_fragments:
+        resp = response_socket.recv_string()
+        print('Received: %s' % resp)
+
+    t2_full = time.perf_counter()
+    dur_full = t2_full-t1_full
+    logger_storing.info(str(len(file_data)) + ", " + str(max_erasures) + ", " + str(dur_full))
+
+    return fragment_names
+
+
+def store_file_old(file_data, max_erasures, send_task_socket, response_socket):
     """
     Store a file using Reed Solomon erasure coding, protecting it against 'max_erasures' 
     unavailable storage nodes. 
@@ -88,6 +169,7 @@ def store_file(file_data, max_erasures, send_task_socket, response_socket):
         # Generate a coded fragment with these coefficients 
         # (trim the coeffs to the actual length we need)
         encoder.encode_symbol(symbol, coefficients[:symbols])
+
         # Generate a random name for it and save
         name = random_string(8)
         fragment_names.append(name)
@@ -175,7 +257,7 @@ def get_file(coded_fragments, max_erasures, file_size,
     """
     nodes_needed = STORAGE_NODES_NUM - max_erasures
     fragnames = copy.deepcopy(coded_fragments)
-    connected_nodes = check_nodes(heartbeat_req_socket, response_socket)
+    connected_nodes, _ = check_nodes(heartbeat_req_socket, response_socket)
 
     # if > max_erasures nodes are dead
     if len(connected_nodes) < nodes_needed:
@@ -269,7 +351,8 @@ def get_file_for_repair(fragments_to_retrieve, file_size,
 
 
 def check_nodes(heartbeat_request_socket, response_socket):
-    connected_nodes = {}
+    connected_nodes_fragments = {}
+    connected_nodes_ip = []
 
     task = messages_pb2.heartbeat_request()
     heartbeat_request_socket.send_multipart([b"all_nodes", task.SerializeToString()])
@@ -280,10 +363,11 @@ def check_nodes(heartbeat_request_socket, response_socket):
             msg = response_socket.recv()
             response = messages_pb2.heartbeat_response()
             response.ParseFromString(msg)
-            connected_nodes[response.node_id] = response.fragments
+            connected_nodes_fragments[response.node_id] = response.fragments
+            connected_nodes_ip.append(response.node_ip)
             # print("Node alive:", response.node_id)
 
-    return connected_nodes
+    return connected_nodes_fragments, connected_nodes_ip
 
 
 def start_repair_process(files, repair_socket, repair_response_socket):

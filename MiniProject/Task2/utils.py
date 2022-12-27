@@ -49,3 +49,6 @@ def is_raspberry_pi():
     Returns True if the current platform is a Raspberry Pi, otherwise False.
     """
     return platform.uname().node == 'raspberrypi'
+
+def is_docker():
+    return 'WSL' in platform.uname().release
