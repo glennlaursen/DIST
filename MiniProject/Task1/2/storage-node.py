@@ -10,7 +10,8 @@ import logging
 import zmq
 
 import messages_pb2
-from utils import random_string, write_file, is_raspberry_pi
+from utils import random_string, write_file, is_raspberry_pi, is_docker
+
 
 def find_and_send_file(recv_socker: zmq.Socket, response_socket: zmq.Socket):
     # Data request for files using hdfs method
@@ -69,6 +70,11 @@ if is_raspberry_pi():
     pull_address = "tcp://192.168.0." + server_address + ":5557"
     push_address = "tcp://192.168.0." + server_address + ":5558"
     subscriber_address = "tcp://192.168.0." + server_address + ":5559"
+elif is_docker():
+    server_address = "server"  # input("Server address: 192.168.0.___ ")
+    pull_address = "tcp://" + server_address + ":5557"
+    push_address = "tcp://" + server_address + ":5558"
+    subscriber_address = "tcp://" + server_address + ":5559"
 else:
     # On the local computer: use localhost
     pull_address = "tcp://localhost:5557"
