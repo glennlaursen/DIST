@@ -10,5 +10,6 @@ EXPOSE 5559
 EXPOSE 5560
 EXPOSE 5561
 EXPOSE 6666
+EXPOSE 7777
 COPY . .
 CMD python -u storage-node.py $name

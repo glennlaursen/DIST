@@ -1,4 +1,5 @@
 import random
+import time
 
 import zmq
 
@@ -12,19 +13,28 @@ STORAGE_NODES_NUM = 4
 REQUEST_TIMEOUT = 1000
 
 
-def store_file(file_data: bytearray, k: int, context: zmq.Context):
+def store_file(file_data: bytearray, k: int, context: zmq.Context, original_filename: str, measure: bool):
     """
     Implements storing a file in a delegated manner using 4 storage nodes.
 
     :param file_data: A bytearray that holds the file contents
     :param k: The number of replicas to store
     :param context: A ZMQ context
+    :param original_filename: The filename put into the http request
+    :param measure: Bool. True if replica generation measurements should be made
     :return: Storage details: { "filename", "n_replicas_k", "replica_locations" }
     """
 
     # Make sure we can realize max_erasures with 4 storage nodes
     assert (k > 0)
     assert (k <= STORAGE_NODES_NUM)
+
+    if measure:
+        time_measure_socket = context.socket(zmq.REP)
+        time_measure_socket.bind('tcp://*:7777')
+
+        # Start the stopwatch / counter
+        t1_start = time.perf_counter()
 
     # Generate a random name for the file.
     file_data_name = random_string()
@@ -55,6 +65,21 @@ def store_file(file_data: bytearray, k: int, context: zmq.Context):
 
     resp = hdfs_send_data_socket.recv_string()
     print('Received: %s' % resp)
+
+    if measure:
+        # Wait for message from last node in delegation.
+        r = time_measure_socket.recv_string()
+
+        # Stop the stopwatch / counter
+        t1_stop = time.perf_counter()
+
+        # Close measurement socket
+        time_measure_socket.close()
+
+        # Log measurement
+        f = open("hdfs_replica_" + str(k) + "k_" + original_filename + ".csv", "a")
+        f.write(str(t1_stop - t1_start) + "\n")
+        f.close()
 
     storage_details = {
         "filename": file_data_name,

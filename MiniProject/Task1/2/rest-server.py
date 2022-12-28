@@ -185,13 +185,15 @@ def add_files_multipart():
     storage_mode = payload.get('storage', RAID1, type=str)
     print("Storage mode: %s" % storage_mode)
 
+    measure = "true" == payload.get('measure', "False").lower()
+
     if storage_mode == RAID1:
         # Raid1 using k replicas
-        storage_details = raid1.store_file_2(data, n_replicas_k, send_task_socket, response_socket)
+        storage_details = raid1.store_file_2(data, n_replicas_k, send_task_socket, response_socket, filename, measure)
 
     elif storage_mode == HDFS:
         # HDFS-like, using delegation
-        storage_details = hdfs.store_file(data, n_replicas_k, context)
+        storage_details = hdfs.store_file(data, n_replicas_k, context, filename, measure)
 
     # Insert the File record in the DB
     db = get_db()

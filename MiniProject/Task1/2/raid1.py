@@ -1,3 +1,5 @@
+import time
+
 import zmq
 
 import messages_pb2
@@ -7,7 +9,7 @@ from utils import random_string
 STORAGE_NODES_NUM = 4
 
 
-def store_file_2(file_data: bytearray, k: int, send_task_socket: zmq.Socket, response_socket: zmq.Socket):
+def store_file_2(file_data: bytearray, k: int, send_task_socket: zmq.Socket, response_socket: zmq.Socket, original_filename: str, measure: bool):
     """
     Implements storing a file with RAID 1 using 4 storage nodes.
 
@@ -15,12 +17,18 @@ def store_file_2(file_data: bytearray, k: int, send_task_socket: zmq.Socket, res
     :param k: The number of replicas to store
     :param send_task_socket: A ZMQ PUSH socket to the storage nodes
     :param response_socket: A ZMQ PULL socket where the storage nodes respond.
+    :param original_filename: The filename put into the http request
+    :param measure: Bool. True if replica generation measurements should be made
     :return: Storage Details
     """
 
     # Make sure we can realize max_erasures with 4 storage nodes
     assert (k > 0)
     assert (k <= STORAGE_NODES_NUM)
+
+    if measure:
+        # Start the stopwatch / counter
+        t1_start = time.perf_counter()
 
     # Send k 'store data' Protobuf requests with the file and filename
     for i in range(k):
@@ -39,6 +47,14 @@ def store_file_2(file_data: bytearray, k: int, send_task_socket: zmq.Socket, res
         print('Received: %s' % resp)
         filenames_and_locations[resp['filename']] = resp['ip']
 
+    if measure:
+        # Stop the stopwatch / counter
+        t1_stop = time.perf_counter()
+
+        # Log measurement
+        f = open("raid1_replica_" + str(k) + "k_" + original_filename + ".csv", "a")
+        f.write(str(t1_stop - t1_start) + "\n")
+        f.close()
 
     storage_details = {
         "filenames_and_locations": filenames_and_locations,

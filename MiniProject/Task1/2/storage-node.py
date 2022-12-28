@@ -168,6 +168,12 @@ while True:
                 data
             ])
             delegated_send_socket.close()
+        else:
+            time_measure_socket = context.socket(zmq.REQ)
+            addr = "192.168.0.101" if is_raspberry_pi() else "server"
+            time_measure_socket.connect('tcp://' + addr + ':7777')
+            time_measure_socket.send_string("done")
+            time_measure_socket.close()
 
     if hdfs_data_req_socket in socks:
         find_and_send_file(hdfs_data_req_socket, hdfs_data_req_socket)
