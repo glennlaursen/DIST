@@ -107,7 +107,7 @@ def store_file(file_data, max_erasures, send_task_socket, response_socket):
 
 def store_file_delegate(data, max_erasures, heartbeat_socket, response_socket, context):
     # Delegate storage
-    _, ips = check_nodes(heartbeat_socket, response_socket)
+    _, ips = check_nodes(heartbeat_socket, response_socket, STORAGE_NODES_NUM)
     rand_ip = random.choice(ips)
     print("Delegating encoding to", rand_ip)
     ips.remove(rand_ip)
@@ -177,7 +177,7 @@ def get_file(coded_fragments, max_erasures, file_size,
     """
     nodes_needed = STORAGE_NODES_NUM - max_erasures
     fragnames = copy.deepcopy(coded_fragments)
-    connected_nodes, _ = check_nodes(heartbeat_req_socket, response_socket)
+    connected_nodes, _ = check_nodes(heartbeat_req_socket, response_socket, STORAGE_NODES_NUM)
 
     # if > max_erasures nodes are dead
     if len(connected_nodes) < nodes_needed:
@@ -233,7 +233,7 @@ def get_file_delegate(coded_fragments, max_erasures, file_size,
 
     nodes_needed = STORAGE_NODES_NUM - max_erasures
     fragnames = copy.deepcopy(coded_fragments)
-    connected_nodes, ips = check_nodes(heartbeat_req_socket, response_socket)
+    connected_nodes, ips = check_nodes(heartbeat_req_socket, response_socket, STORAGE_NODES_NUM)
 
     # if > max_erasures nodes are dead
     if len(connected_nodes) < nodes_needed:
