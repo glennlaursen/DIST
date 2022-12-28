@@ -133,7 +133,7 @@ def store_file_delegate(data, max_erasures, heartbeat_socket, response_socket, c
     # Delegate storage
     _, ips = check_nodes(heartbeat_socket, response_socket)
     rand_ip = random.choice(ips)
-    print("Delegating to", rand_ip)
+    print("Delegating encoding to", rand_ip)
     ips.remove(rand_ip)
 
     encode_socket = context.socket(zmq.REQ)
@@ -185,9 +185,6 @@ def decode_file(symbols):
     print("File decoded successfully")
 
     return data_out
-
-
-#
 
 
 def get_file(coded_fragments, max_erasures, file_size,
@@ -251,6 +248,75 @@ def get_file(coded_fragments, max_erasures, file_size,
 
     # Reconstruct the original file data
     file_data = decode_file(symbols)
+
+    return file_data[:file_size]
+
+
+def get_file_delegate(coded_fragments, max_erasures, file_size,
+             data_req_socket, heartbeat_req_socket, response_socket, context):
+
+    nodes_needed = STORAGE_NODES_NUM - max_erasures
+    fragnames = copy.deepcopy(coded_fragments)
+    connected_nodes, ips = check_nodes(heartbeat_req_socket, response_socket)
+
+    # if > max_erasures nodes are dead
+    if len(connected_nodes) < nodes_needed:
+        msg = "Not enough nodes online to fetch file"
+        print(msg)
+        return msg
+    # if <= max_erasures nodes are dead
+    elif len(connected_nodes) >= nodes_needed:
+        # Get list of all frags located on live nodes
+        all_frags = [item for sublist in connected_nodes.values() for item in sublist]
+
+        # Copy of fragnames to loop over since we have to clear fragnames
+        new_fragnames = copy.deepcopy(fragnames)
+
+        # New list of needed fragments found on live nodes only
+        fragnames.clear()
+        fragnames = [frag for frag in new_fragnames if frag in all_frags]
+
+        # If there are more fragments than needed, remove the excess
+        if len(fragnames) > nodes_needed:
+            to_remove = len(fragnames) - nodes_needed
+            for i in range(to_remove):
+                fragnames.remove(random.choice(fragnames))
+
+    # Request the coded fragments in parallel
+    for name in fragnames:
+        task = messages_pb2.getdata_request()
+        task.filename = name
+        data_req_socket.send(
+            task.SerializeToString()
+        )
+
+    # Receive all chunks and insert them into the symbols array
+    symbols = []
+    for _ in range(len(fragnames)):
+        result = response_socket.recv_multipart()
+        # In this case we don't care about the received name, just use the
+        # data from the second frame
+        symbols.append({
+            "chunkname": result[0].decode('utf-8'),
+            "data": bytearray(result[1])
+        })
+    print("All coded fragments received successfully")
+
+    rand_ip = random.choice(ips)
+    print("Delegating decoding to", rand_ip)
+    ips.remove(rand_ip)
+
+    decode_socket = context.socket(zmq.REQ)
+    addr = "tcp://" + rand_ip + ':5543'
+    decode_socket.connect(addr)
+
+    decode_socket.send_pyobj({
+        "data": symbols,
+        "size": file_size,
+    })
+
+    result = decode_socket.recv()
+    file_data = result
 
     return file_data[:file_size]
 

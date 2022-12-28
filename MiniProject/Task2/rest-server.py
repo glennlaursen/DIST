@@ -71,7 +71,6 @@ heartbeat_socket.bind("tcp://*:5562")
 time.sleep(1)
 print("Listening to ZMQ messages on tcp://*:5558 and tcp://*:5561")
 
-
 # Instantiate the Flask app (must be before the endpoint functions)
 app = Flask(__name__)
 
@@ -139,15 +138,28 @@ def download_file(file_id):
 
         coded_fragments = storage_details['coded_fragments']
         max_erasures = storage_details['max_erasures']
+        type = storage_details['type']
 
-        file_data = reedsolomon.get_file(
-            coded_fragments,
-            max_erasures,
-            f['size'],
-            data_req_socket,
-            heartbeat_socket,
-            response_socket
-        )
+        if type == 1:
+
+            file_data = reedsolomon.get_file(
+                coded_fragments,
+                max_erasures,
+                f['size'],
+                data_req_socket,
+                heartbeat_socket,
+                response_socket
+            )
+        elif type == 2:
+            file_data = reedsolomon.get_file_delegate(
+                coded_fragments,
+                max_erasures,
+                f['size'],
+                data_req_socket,
+                heartbeat_socket,
+                response_socket,
+                context
+            )
 
     if file_data is None:
         return make_response('Something went wrong, please try again', 404)
@@ -261,7 +273,8 @@ def add_files_multipart():
             if fragment_names is not None:
                 storage_details = {
                     "coded_fragments": fragment_names,
-                    "max_erasures": max_erasures
+                    "max_erasures": max_erasures,
+                    "type": type
                 }
             else:
                 return make_response("Something went wrong, try again", 400)

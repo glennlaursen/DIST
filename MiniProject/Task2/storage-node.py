@@ -243,7 +243,7 @@ while True:
 
     if delegation_socket in socks:
         msg = delegation_socket.recv_multipart()
-        # Parse the Protobuf message from the first frame
+
         task = messages_pb2.storedata_request()
         task.ParseFromString(msg[0])
 
@@ -257,6 +257,14 @@ while True:
 
         delegation_socket.send_pyobj({'filename': task.filename, 'ip': own_ip})
 
+    if decode_socket in socks:
+        msg = decode_socket.recv_pyobj()
+        symbols = msg['data']
+        file_size = msg['size']
+
+        data = reedsolomon.decode_file(symbols)
+
+        decode_socket.send(data[:file_size])
 
     if repair_subscriber in socks:
         # Incoming message on the 'repair_subscriber' socket
