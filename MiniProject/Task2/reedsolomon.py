@@ -56,10 +56,7 @@ def encode_file(file_data, max_erasures):
         # (trim the coeffs to the actual length we need)
         encoder.encode_symbol(symbol, coefficients[:symbols])
 
-        # Generate a random name for it and save
-        name = random_string(8)
-
-        encoded_fragments.append({"name": name, "data": coefficients[:symbols] + bytearray(symbol)})
+        encoded_fragments.append(coefficients[:symbols] + bytearray(symbol))
 
     t2 = time.perf_counter()
     duration = t2-t1
@@ -83,18 +80,18 @@ def store_file(file_data, max_erasures, send_task_socket, response_socket):
     """
 
     encoded_fragments = encode_file(file_data,max_erasures)
-    fragment_names = [f['name'] for f in encoded_fragments]
+    fragment_names = [random_string(8) for x in encoded_fragments]
 
     # Generate one coded fragment for each Storage Node
-    for fragment in encoded_fragments:
+    for i, fragment in enumerate(encoded_fragments):
 
         # Send a Protobuf STORE DATA request to the Storage Nodes
         task = messages_pb2.storedata_request()
-        task.filename = fragment['name']
+        task.filename = fragment_names[i]
 
         send_task_socket.send_multipart([
             task.SerializeToString(),
-            fragment['data']
+            fragment
         ])
 
     # Wait until we receive a response for every fragment
@@ -119,7 +116,8 @@ def store_file_delegate(data, max_erasures, heartbeat_socket, response_socket, c
     encode_socket.send_pyobj({
         "data": data,
         "ips": ips,
-        "max_erasures": max_erasures
+        "max_erasures": max_erasures,
+        "n_nodes": STORAGE_NODES_NUM
     })
 
     result = encode_socket.recv_pyobj()

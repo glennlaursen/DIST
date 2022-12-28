@@ -210,13 +210,15 @@ while True:
         data = msg['data']
         ips = msg['ips']
         max_erasures = int(msg['max_erasures'])
+        n_nodes = int(msg['n_nodes'])
 
-        encoded_fragments = reedsolomon.encode_file(data, max_erasures)
-        fragment_names = [f['name'] for f in encoded_fragments]
+        fragment_names = [random_string(8) for x in range(n_nodes)]
 
         encode_socket.send_pyobj({
             "names": fragment_names
         })
+
+        encoded_fragments = reedsolomon.encode_file(data, max_erasures)
 
         sockets = []
         for i, fragment in enumerate(encoded_fragments[:-1]):
@@ -227,15 +229,15 @@ while True:
             sock.connect(addr)
             sockets.append(sock)
             task = messages_pb2.storedata_request()
-            task.filename = fragment['name']
+            task.filename = fragment_names[i]
             sock.send_multipart([
                 task.SerializeToString(),
-                fragment['data']
+                fragment
             ])
 
-        data = encoded_fragments[-1]['data']
+        data = encoded_fragments[-1]
         # Store the chunk with the given filename
-        chunk_local_path = data_folder + '/' + encoded_fragments[-1]['name']
+        chunk_local_path = data_folder + '/' + fragment_names[-1]
         write_file(data, chunk_local_path)
         print("Chunk saved to %s" % chunk_local_path)
 
