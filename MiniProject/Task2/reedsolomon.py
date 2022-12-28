@@ -8,35 +8,16 @@ import copy  # for deepcopy
 
 import zmq
 
-from utils import random_string
+from utils import random_string, check_nodes, create_logger
 import messages_pb2
 import json
 
 import logging
 
 # Create custom loggers
-f_format = logging.Formatter('%(message)s')
-
-logger_encoding = logging.getLogger("rs_encoding")
-logger_encoding.setLevel(logging.DEBUG)
-f_handler = logging.FileHandler('log_rs_en.log')
-f_handler.setFormatter(f_format)
-logger_encoding.addHandler(f_handler)
-
-logger_decoding = logging.getLogger("rs_decoding")
-logger_decoding.setLevel(logging.DEBUG)
-f_handler = logging.FileHandler('log_rs_de.log')
-f_handler.setFormatter(f_format)
-logger_decoding.addHandler(f_handler)
-
-logger_storing = logging.getLogger("rs_storing")
-logger_storing.setLevel(logging.DEBUG)
-f_handler = logging.FileHandler('log_rs_st.log')
-f_handler.setFormatter(f_format)
-logger_storing.addHandler(f_handler)
-
-#logger_encoding.info("File Size, Max Erasures, Encoding Time")
-#logger_decoding.info("File Size, Decoding Time")
+logger_encoding = create_logger("rs_encoding", "log_rs_en.log")
+logger_decoding = create_logger("rs_decoding", "log_rs_de.log")
+#logger_storing = create_logger("rs_storing", "log_rs_st.log")
 
 STORAGE_NODES_NUM = 4
 
@@ -49,6 +30,8 @@ RS_CAUCHY_COEFFS = [
 
 
 def encode_file(file_data, max_erasures):
+    t1 = time.perf_counter()
+
     # Make sure we can realize max_erasures with 4 storage nodes
     assert (max_erasures >= 0)
     assert (max_erasures < STORAGE_NODES_NUM)
@@ -78,6 +61,10 @@ def encode_file(file_data, max_erasures):
 
         encoded_fragments.append({"name": name, "data": coefficients[:symbols] + bytearray(symbol)})
 
+    t2 = time.perf_counter()
+    duration = t2-t1
+    logger_encoding.info(str(len(file_data)) + ", " + str(duration))
+
     return encoded_fragments
 
 
@@ -94,8 +81,6 @@ def store_file(file_data, max_erasures, send_task_socket, response_socket):
     :param response_socket: A ZMQ PULL socket where the storage nodes respond
     :return: A list of the coded fragment names, e.g. (c1,c2,c3,c4)
     """
-    t1_full = time.perf_counter()
-    t1 = time.perf_counter()
 
     encoded_fragments = encode_file(file_data,max_erasures)
     fragment_names = [f['name'] for f in encoded_fragments]
@@ -112,19 +97,10 @@ def store_file(file_data, max_erasures, send_task_socket, response_socket):
             fragment['data']
         ])
 
-    t2 = time.perf_counter()
-    dur = t2-t1
-
-    logger_encoding.info(str(len(file_data)) + ", " + str(max_erasures) + ", " + str(dur))
-
     # Wait until we receive a response for every fragment
     for task_nbr in encoded_fragments:
         resp = response_socket.recv_string()
         print('Received: %s' % resp)
-
-    t2_full = time.perf_counter()
-    dur_full = t2_full-t1_full
-    logger_storing.info(str(len(file_data)) + ", " + str(max_erasures) + ", " + str(dur_full))
 
     return fragment_names
 
@@ -179,8 +155,8 @@ def decode_file(symbols):
     assert (decoder.is_complete())
 
     t2 = time.perf_counter()
-    dur = t2-t1
-    logger_decoding.info(str(len(data_out)) + ", " + str(dur))
+    duration = t2-t1
+    logger_decoding.info(str(len(data_out)) + ", " + str(duration))
 
     print("File decoded successfully")
 
@@ -363,7 +339,7 @@ def get_file_for_repair(fragments_to_retrieve, file_size,
     return file_data[:file_size]  # Reconstruct the original data with a decoder
 
 
-def check_nodes(heartbeat_request_socket, response_socket):
+def check_nodes_delete(heartbeat_request_socket, response_socket):
     connected_nodes_fragments = {}
     connected_nodes_ip = []
 
