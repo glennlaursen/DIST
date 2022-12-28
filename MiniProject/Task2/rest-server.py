@@ -20,8 +20,9 @@ import io # For sending binary data in a HTTP response
 import raid1
 import reedsolomon
 
-from utils import is_raspberry_pi, is_docker
+from utils import is_raspberry_pi, is_docker, create_logger
 
+logger_storing = create_logger("rs_storing", "log_rs_st.log")
 
 def get_db():
     if 'db' not in g:
@@ -219,6 +220,7 @@ def delete_file(file_id):
 
 @app.route('/files_mp', methods=['POST'])
 def add_files_multipart():
+
     # Flask separates files from the other form fields
     payload = request.form
     files = request.files
@@ -292,6 +294,8 @@ def add_files_multipart():
         (filename, size, content_type, storage_mode, json.dumps(storage_details))
     )
     db.commit()
+
+
 
     return make_response({"id": cursor.lastrowid }, 201)
 #

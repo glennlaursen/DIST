@@ -4,6 +4,7 @@ import platform
 
 import messages_pb2
 import zmq
+import logging
 
 
 def random_string(length=8):
@@ -44,11 +45,40 @@ def write_file(data, filename=None):
     return filename
 
 
+def check_nodes(heartbeat_request_socket, response_socket, n_nodes):
+    connected_nodes_fragments = {}
+    connected_nodes_ip = []
+
+    task = messages_pb2.heartbeat_request()
+    heartbeat_request_socket.send_multipart([b"all_nodes", task.SerializeToString()])
+
+    # Check to see which nodes are alive
+    for i in range(n_nodes):
+        if response_socket.poll(500, zmq.POLLIN):
+            msg = response_socket.recv()
+            response = messages_pb2.heartbeat_response()
+            response.ParseFromString(msg)
+            connected_nodes_fragments[response.node_id] = response.fragments
+            connected_nodes_ip.append(response.node_ip)
+
+    return connected_nodes_fragments, connected_nodes_ip
+
+
 def is_raspberry_pi():
     """
     Returns True if the current platform is a Raspberry Pi, otherwise False.
     """
     return platform.uname().node == 'raspberrypi'
 
+
 def is_docker():
     return 'WSL' in platform.uname().release
+
+
+def create_logger(name, path):
+    logger = logging.getLogger(name)
+    logger.setLevel(logging.DEBUG)
+    f_handler = logging.FileHandler(path)
+    f_handler.setFormatter(logging.Formatter('%(message)s'))
+    logger.addHandler(f_handler)
+    return logger

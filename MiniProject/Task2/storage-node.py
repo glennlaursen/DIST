@@ -13,7 +13,7 @@ import os
 import random
 import string
 
-from utils import random_string, write_file, is_raspberry_pi, is_docker
+from utils import random_string, write_file, is_raspberry_pi, is_docker, create_logger
 import reedsolomon
 
 MAX_CHUNKS_PER_FILE = 10
@@ -231,7 +231,7 @@ while True:
 
         data = encoded_fragments[-1]['data']
         # Store the chunk with the given filename
-        chunk_local_path = data_folder + '/' + encoded_fragments[-1]['name']# + "." + str(0)
+        chunk_local_path = data_folder + '/' + encoded_fragments[-1]['name']
         write_file(data, chunk_local_path)
         print("Chunk saved to %s" % chunk_local_path)
 
@@ -251,7 +251,7 @@ while True:
             data = msg[1 + i]
             print('Chunk to save: %s, size: %d bytes' % (task.filename + "." + str(i), len(data)))
             # Store the chunk with the given filename
-            chunk_local_path = data_folder + '/' + task.filename# + "." + str(i)
+            chunk_local_path = data_folder + '/' + task.filename
             write_file(data, chunk_local_path)
             print("Chunk saved to %s" % chunk_local_path)
 
