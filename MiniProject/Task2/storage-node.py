@@ -204,13 +204,12 @@ while True:
     if encode_socket in socks:
         msg = encode_socket.recv_pyobj()
         data = msg['data']
-        max_erasures = int(msg['max_erasures'])
-        filename = msg['filename']
         ips = msg['ips']
+        max_erasures = int(msg['max_erasures'])
 
         encoded_fragments = reedsolomon.encode_file(data, max_erasures)
-
         fragment_names = [f['name'] for f in encoded_fragments]
+
         encode_socket.send_pyobj({
             "names": fragment_names
         })

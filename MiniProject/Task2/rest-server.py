@@ -218,7 +218,7 @@ def add_files_multipart():
 
     # Reference to the file under 'file' key
     file = files.get('file')
-    # The sender encodes a the file name and type together with the file contents
+    # The sender encodes the file name and type together with the file contents
     filename = file.filename
     content_type = file.mimetype
     # Load the file contents into a bytearray and measure its size
@@ -248,33 +248,15 @@ def add_files_multipart():
         if max_erasures > 2:
             return make_response('max_erasures cannot exceed 2, please try again', 400)
         else:
-            fragment_names = None
-
             print("Max erasures: %d" % (max_erasures))
-
+            fragment_names = None
             if type == 1:
                 # Store the file contents with Reed Solomon erasure coding
                 fragment_names = reedsolomon.store_file(data, max_erasures, send_task_socket, response_socket)
             elif type == 2:
-                # Delegate storage
-                _, ips = reedsolomon.check_nodes(heartbeat_socket, response_socket)
-                rand_ip = random.choice(ips)
-                print("Delegating to", rand_ip)
-                ips.remove(rand_ip)
-
-                encode_socket = context.socket(zmq.REQ)
-                addr = "tcp://" + rand_ip + ':5542'
-                encode_socket.connect(addr)
-
-                encode_socket.send_pyobj({
-                    "data": data,
-                    "filename": filename,
-                    "ips": ips,
-                    "max_erasures": max_erasures
-                })
-
-                result = encode_socket.recv_pyobj()
-                fragment_names = result['names']
+                # Store the file, delegating encoding to random node
+                fragment_names = reedsolomon.store_file_delegate(data, max_erasures, heartbeat_socket,
+                                                                 response_socket, context)
 
             if fragment_names is not None:
                 storage_details = {
@@ -291,19 +273,12 @@ def add_files_multipart():
     # Insert the File record in the DB
     import json
     db = get_db()
-    print(filename)
-    print(size)
-    print(content_type)
-    print(storage_mode)
-    print(storage_details)
 
     cursor = db.execute(
         "INSERT INTO `file`(`filename`, `size`, `content_type`, `storage_mode`, `storage_details`) VALUES (?,?,?,?,?)",
         (filename, size, content_type, storage_mode, json.dumps(storage_details))
     )
     db.commit()
-
-
 
     return make_response({"id": cursor.lastrowid }, 201)
 #
