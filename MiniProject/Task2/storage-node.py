@@ -56,6 +56,8 @@ if is_raspberry_pi():
     repair_subscriber_address = "tcp://192.168.0." + server_address + ":5560"
     repair_sender_address = "tcp://192.168.0." + server_address + ":5561"
     heartbeat_subscriber_address = "tcp://192.168.0." + server_address + ":5562"
+    timer_address = "tcp://192.168.0." + server_address + ":5545"
+
 
 elif is_docker():
     server_address = "server"  # input("Server address: 192.168.0.___ ")
@@ -65,6 +67,7 @@ elif is_docker():
     repair_subscriber_address = "tcp://" + server_address + ":5560"
     repair_sender_address = "tcp://" + server_address + ":5561"
     heartbeat_subscriber_address = "tcp://" + server_address + ":5562"
+    timer_address = "tcp://" + server_address + ":5545"
 
 else:
     # On the local computer: use localhost
@@ -74,6 +77,7 @@ else:
     repair_subscriber_address = "tcp://localhost:5560"
     repair_sender_address = "tcp://localhost:5561"
     heartbeat_subscriber_address = "tcp://localhost:5562"
+    timer_address = "tcp://localhost:5545"
 
 context = zmq.Context()
 
@@ -206,13 +210,15 @@ while True:
         data = msg['data']
         ips = msg['ips']
         max_erasures = int(msg['max_erasures'])
+        n_nodes = int(msg['n_nodes'])
 
-        encoded_fragments = reedsolomon.encode_file(data, max_erasures)
-        fragment_names = [f['name'] for f in encoded_fragments]
+        fragment_names = [random_string(8) for x in range(n_nodes)]
 
         encode_socket.send_pyobj({
             "names": fragment_names
         })
+
+        encoded_fragments = reedsolomon.encode_file(data, max_erasures)
 
         sockets = []
         for i, fragment in enumerate(encoded_fragments[:-1]):
@@ -223,15 +229,15 @@ while True:
             sock.connect(addr)
             sockets.append(sock)
             task = messages_pb2.storedata_request()
-            task.filename = fragment['name']
+            task.filename = fragment_names[i]
             sock.send_multipart([
                 task.SerializeToString(),
-                fragment['data']
+                fragment
             ])
 
-        data = encoded_fragments[-1]['data']
+        data = encoded_fragments[-1]
         # Store the chunk with the given filename
-        chunk_local_path = data_folder + '/' + encoded_fragments[-1]['name']
+        chunk_local_path = data_folder + '/' + fragment_names[-1]
         write_file(data, chunk_local_path)
         print("Chunk saved to %s" % chunk_local_path)
 
@@ -240,6 +246,12 @@ while True:
             res_filename = resp['filename']
             res_ip = resp['ip']
             print(f'File {res_filename} stored on {res_ip}')
+
+        # Send all fragments done
+        timer_socket = context.socket(zmq.REQ)
+        timer_socket.connect(timer_address)
+        timer_socket.send_string("All fragments stored")
+        timer_socket.close()
 
     if delegation_socket in socks:
         msg = delegation_socket.recv_multipart()
@@ -261,8 +273,9 @@ while True:
         msg = decode_socket.recv_pyobj()
         symbols = msg['data']
         file_size = msg['size']
+        max_erasures = msg['max_erasures']
 
-        data = reedsolomon.decode_file(symbols)
+        data = reedsolomon.decode_file(symbols, max_erasures)
 
         decode_socket.send(data[:file_size])
 

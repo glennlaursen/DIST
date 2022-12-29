@@ -56,14 +56,11 @@ def encode_file(file_data, max_erasures):
         # (trim the coeffs to the actual length we need)
         encoder.encode_symbol(symbol, coefficients[:symbols])
 
-        # Generate a random name for it and save
-        name = random_string(8)
-
-        encoded_fragments.append({"name": name, "data": coefficients[:symbols] + bytearray(symbol)})
+        encoded_fragments.append(coefficients[:symbols] + bytearray(symbol))
 
     t2 = time.perf_counter()
     duration = t2-t1
-    logger_encoding.info(str(len(file_data)) + ", " + str(duration))
+    logger_encoding.info(str(len(file_data)) + "," + str(max_erasures) + "," + str(duration))
 
     return encoded_fragments
 
@@ -83,18 +80,18 @@ def store_file(file_data, max_erasures, send_task_socket, response_socket):
     """
 
     encoded_fragments = encode_file(file_data,max_erasures)
-    fragment_names = [f['name'] for f in encoded_fragments]
+    fragment_names = [random_string(8) for x in encoded_fragments]
 
     # Generate one coded fragment for each Storage Node
-    for fragment in encoded_fragments:
+    for i, fragment in enumerate(encoded_fragments):
 
         # Send a Protobuf STORE DATA request to the Storage Nodes
         task = messages_pb2.storedata_request()
-        task.filename = fragment['name']
+        task.filename = fragment_names[i]
 
         send_task_socket.send_multipart([
             task.SerializeToString(),
-            fragment['data']
+            fragment
         ])
 
     # Wait until we receive a response for every fragment
@@ -107,7 +104,7 @@ def store_file(file_data, max_erasures, send_task_socket, response_socket):
 
 def store_file_delegate(data, max_erasures, heartbeat_socket, response_socket, context):
     # Delegate storage
-    _, ips = check_nodes(heartbeat_socket, response_socket)
+    _, ips = check_nodes(heartbeat_socket, response_socket, STORAGE_NODES_NUM)
     rand_ip = random.choice(ips)
     print("Delegating encoding to", rand_ip)
     ips.remove(rand_ip)
@@ -119,14 +116,15 @@ def store_file_delegate(data, max_erasures, heartbeat_socket, response_socket, c
     encode_socket.send_pyobj({
         "data": data,
         "ips": ips,
-        "max_erasures": max_erasures
+        "max_erasures": max_erasures,
+        "n_nodes": STORAGE_NODES_NUM
     })
 
     result = encode_socket.recv_pyobj()
     return result['names']
 
 
-def decode_file(symbols):
+def decode_file(symbols, max_erasures):
     """
     Decode a file using Reed Solomon decoder and the provided coded symbols.
     The number of symbols must be the same as STORAGE_NODES_NUM - max_erasures.
@@ -156,7 +154,7 @@ def decode_file(symbols):
 
     t2 = time.perf_counter()
     duration = t2-t1
-    logger_decoding.info(str(len(data_out)) + ", " + str(duration))
+    logger_decoding.info(str(len(data_out)) + "," + str(max_erasures) + "," + str(duration))
 
     print("File decoded successfully")
 
@@ -177,7 +175,7 @@ def get_file(coded_fragments, max_erasures, file_size,
     """
     nodes_needed = STORAGE_NODES_NUM - max_erasures
     fragnames = copy.deepcopy(coded_fragments)
-    connected_nodes, _ = check_nodes(heartbeat_req_socket, response_socket)
+    connected_nodes, _ = check_nodes(heartbeat_req_socket, response_socket, STORAGE_NODES_NUM)
 
     # if > max_erasures nodes are dead
     if len(connected_nodes) < nodes_needed:
@@ -223,7 +221,7 @@ def get_file(coded_fragments, max_erasures, file_size,
     print("All coded fragments received successfully")
 
     # Reconstruct the original file data
-    file_data = decode_file(symbols)
+    file_data = decode_file(symbols, max_erasures)
 
     return file_data[:file_size]
 
@@ -233,7 +231,7 @@ def get_file_delegate(coded_fragments, max_erasures, file_size,
 
     nodes_needed = STORAGE_NODES_NUM - max_erasures
     fragnames = copy.deepcopy(coded_fragments)
-    connected_nodes, ips = check_nodes(heartbeat_req_socket, response_socket)
+    connected_nodes, ips = check_nodes(heartbeat_req_socket, response_socket, STORAGE_NODES_NUM)
 
     # if > max_erasures nodes are dead
     if len(connected_nodes) < nodes_needed:
@@ -289,6 +287,7 @@ def get_file_delegate(coded_fragments, max_erasures, file_size,
     decode_socket.send_pyobj({
         "data": symbols,
         "size": file_size,
+        "max_erasures": max_erasures
     })
 
     result = decode_socket.recv()

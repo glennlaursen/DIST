@@ -22,7 +22,8 @@ import reedsolomon
 
 from utils import is_raspberry_pi, is_docker, create_logger
 
-logger_storing = create_logger("rs_storing", "log_rs_st.log")
+logger_storing_all = create_logger("rs_storing_all", "log_rs_st_all.log")
+logger_storing_server = create_logger("rs_storing_ser", "log_rs_st_ser.log")
 
 def get_db():
     if 'db' not in g:
@@ -221,6 +222,8 @@ def delete_file(file_id):
 @app.route('/files_mp', methods=['POST'])
 def add_files_multipart():
 
+    t1 = time.perf_counter()
+
     # Flask separates files from the other form fields
     payload = request.form
     files = request.files
@@ -243,6 +246,7 @@ def add_files_multipart():
     # Read the requested storage mode from the form (default value: 'raid1')
     storage_mode = payload.get('storage', 'raid1')
     print("Storage mode: %s" % storage_mode)
+    measure = payload.get('measure', 'false')
 
     if storage_mode == 'raid1':
         file_data_1_names, file_data_2_names = raid1.store_file(data, send_task_socket, response_socket)
@@ -271,6 +275,13 @@ def add_files_multipart():
                 # Store the file, delegating encoding to random node
                 fragment_names = reedsolomon.store_file_delegate(data, max_erasures, heartbeat_socket,
                                                                  response_socket, context)
+                t_server_done = time.perf_counter()
+                if measure == 'true':
+                    # Wait for all fragments to be stored
+                    timer_socket = context.socket(zmq.REP)
+                    timer_socket.bind("tcp://*:5545")
+                    resp = timer_socket.recv_string()
+                    print(resp)
 
             if fragment_names is not None:
                 storage_details = {
@@ -285,6 +296,14 @@ def add_files_multipart():
         logging.error("Unexpected storage mode: %s" % storage_mode)
         return make_response("Wrong storage mode", 400)
 
+    t2 = time.perf_counter()
+    duration_all = t2-t1
+    logger_storing_all.info(str(len(data)) + "," + str(max_erasures) + "," + str(duration_all))
+
+    if measure == 'true':
+        duration_server = t_server_done-t1
+        logger_storing_server.info(str(len(data)) + "," + str(max_erasures) + "," + str(duration_server))
+
     # Insert the File record in the DB
     import json
     db = get_db()
@@ -294,8 +313,6 @@ def add_files_multipart():
         (filename, size, content_type, storage_mode, json.dumps(storage_details))
     )
     db.commit()
-
-
 
     return make_response({"id": cursor.lastrowid }, 201)
 #
