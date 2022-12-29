@@ -273,8 +273,9 @@ while True:
         msg = decode_socket.recv_pyobj()
         symbols = msg['data']
         file_size = msg['size']
+        max_erasures = msg['max_erasures']
 
-        data = reedsolomon.decode_file(symbols)
+        data = reedsolomon.decode_file(symbols, max_erasures)
 
         decode_socket.send(data[:file_size])
 

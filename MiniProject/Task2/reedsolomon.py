@@ -60,7 +60,7 @@ def encode_file(file_data, max_erasures):
 
     t2 = time.perf_counter()
     duration = t2-t1
-    logger_encoding.info(str(duration))
+    logger_encoding.info(str(len(file_data)) + "," + str(max_erasures) + "," + str(duration))
 
     return encoded_fragments
 
@@ -124,7 +124,7 @@ def store_file_delegate(data, max_erasures, heartbeat_socket, response_socket, c
     return result['names']
 
 
-def decode_file(symbols):
+def decode_file(symbols, max_erasures):
     """
     Decode a file using Reed Solomon decoder and the provided coded symbols.
     The number of symbols must be the same as STORAGE_NODES_NUM - max_erasures.
@@ -154,7 +154,7 @@ def decode_file(symbols):
 
     t2 = time.perf_counter()
     duration = t2-t1
-    logger_decoding.info(str(duration))
+    logger_decoding.info(str(len(data_out)) + "," + str(max_erasures) + "," + str(duration))
 
     print("File decoded successfully")
 
@@ -221,7 +221,7 @@ def get_file(coded_fragments, max_erasures, file_size,
     print("All coded fragments received successfully")
 
     # Reconstruct the original file data
-    file_data = decode_file(symbols)
+    file_data = decode_file(symbols, max_erasures)
 
     return file_data[:file_size]
 
@@ -287,6 +287,7 @@ def get_file_delegate(coded_fragments, max_erasures, file_size,
     decode_socket.send_pyobj({
         "data": symbols,
         "size": file_size,
+        "max_erasures": max_erasures
     })
 
     result = decode_socket.recv()

@@ -296,14 +296,13 @@ def add_files_multipart():
         logging.error("Unexpected storage mode: %s" % storage_mode)
         return make_response("Wrong storage mode", 400)
 
-
     t2 = time.perf_counter()
     duration_all = t2-t1
-    logger_storing_all.info(str(duration_all))
+    logger_storing_all.info(str(len(data)) + "," + str(max_erasures) + "," + str(duration_all))
 
     if measure == 'true':
         duration_server = t_server_done-t1
-        logger_storing_server.info(str(duration_server))
+        logger_storing_server.info(str(len(data)) + "," + str(max_erasures) + "," + str(duration_server))
 
     # Insert the File record in the DB
     import json
