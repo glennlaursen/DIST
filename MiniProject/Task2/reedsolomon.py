@@ -60,7 +60,7 @@ def encode_file(file_data, max_erasures):
 
     t2 = time.perf_counter()
     duration = t2-t1
-    logger_encoding.info(str(len(file_data)) + ", " + str(duration))
+    logger_encoding.info(str(duration))
 
     return encoded_fragments
 
@@ -154,7 +154,7 @@ def decode_file(symbols):
 
     t2 = time.perf_counter()
     duration = t2-t1
-    logger_decoding.info(str(len(data_out)) + ", " + str(duration))
+    logger_decoding.info(str(duration))
 
     print("File decoded successfully")
 

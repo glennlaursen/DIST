@@ -299,11 +299,11 @@ def add_files_multipart():
 
     t2 = time.perf_counter()
     duration_all = t2-t1
-    duration_server = t_server_done-t1
-    logger_storing_all.info(str(len(data)) + ", " + str(duration_all))
-    logger_storing_server.info(str(len(data)) + ", " + str(duration_server))
+    logger_storing_all.info(str(duration_all))
 
-
+    if measure == 'true':
+        duration_server = t_server_done-t1
+        logger_storing_server.info(str(duration_server))
 
     # Insert the File record in the DB
     import json
