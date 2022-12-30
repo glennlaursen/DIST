@@ -11,19 +11,20 @@ import random
 import string
 import logging
 
-import zmq # For ZMQ
-import time # For waiting a second for ZMQ connections
-import math # For cutting the file in half
-import messages_pb2 # Generated Protobuf messages
-import io # For sending binary data in a HTTP response
+import zmq  # For ZMQ
+import time  # For waiting a second for ZMQ connections
+import math  # For cutting the file in half
+import messages_pb2  # Generated Protobuf messages
+import io  # For sending binary data in a HTTP response
 
 import raid1
 import reedsolomon
 
 from utils import is_raspberry_pi, is_docker, create_logger
 
-logger_storing_all = create_logger("rs_storing_all", "log_rs_st_all.log")
-logger_storing_server = create_logger("rs_storing_ser", "log_rs_st_ser.log")
+logger_full_redun = create_logger("rs_full_redun", "log_rs_full_redun.log")
+logger_lead_node = create_logger("rs_lead_node", "log_rs_lead_node.log")
+
 
 def get_db():
     if 'db' not in g:
@@ -83,11 +84,13 @@ log.setLevel(logging.ERROR)
 # Close the DB connection after serving the request
 app.teardown_appcontext(close_db)
 
+
 @app.route('/')
 def hello():
     return make_response({'message': 'Hello World!'})
 
-@app.route('/files',  methods=['GET'])
+
+@app.route('/files', methods=['GET'])
 def list_files():
     db = get_db()
     cursor = db.execute("SELECT * FROM `file`")
@@ -100,11 +103,12 @@ def list_files():
     files = [dict(file) for file in files]
 
     return make_response({"files": files})
+
+
 #
 
-@app.route('/files/<int:file_id>',  methods=['GET'])
+@app.route('/files/<int:file_id>', methods=['GET'])
 def download_file(file_id):
-
     file_data = None
 
     db = get_db()
@@ -172,13 +176,13 @@ def download_file(file_id):
     else:
         return send_file(io.BytesIO(file_data), mimetype=f['content_type'])
 
+
 #
 
 # HTTP HEAD requests are served by the GET endpoint of the same URL,
 # so we'll introduce a new endpoint URL for requesting file metadata.
-@app.route('/files/<int:file_id>/info',  methods=['GET'])
+@app.route('/files/<int:file_id>/info', methods=['GET'])
 def get_file_metadata(file_id):
-
     db = get_db()
     cursor = db.execute("SELECT * FROM `file` WHERE `id`=?", [file_id])
     if not cursor:
@@ -193,11 +197,12 @@ def get_file_metadata(file_id):
     print("File: %s" % f)
 
     return make_response(f)
+
+
 #
 
-@app.route('/files/<int:file_id>',  methods=['DELETE'])
+@app.route('/files/<int:file_id>', methods=['DELETE'])
 def delete_file(file_id):
-
     db = get_db()
     cursor = db.execute("SELECT * FROM `file` WHERE `id`=?", [file_id])
     if not cursor:
@@ -217,11 +222,12 @@ def delete_file(file_id):
 
     # Return empty 200 Ok response
     return make_response('TODO: implement this endpoint', 404)
+
+
 #
 
 @app.route('/files_mp', methods=['POST'])
 def add_files_multipart():
-
     t1 = time.perf_counter()
 
     # Flask separates files from the other form fields
@@ -246,7 +252,7 @@ def add_files_multipart():
     # Read the requested storage mode from the form (default value: 'raid1')
     storage_mode = payload.get('storage', 'raid1')
     print("Storage mode: %s" % storage_mode)
-    measure = payload.get('measure', 'false')
+    measure_redundancy = payload.get('measure_redundancy', 'false')
 
     if storage_mode == 'raid1':
         file_data_1_names, file_data_2_names = raid1.store_file(data, send_task_socket, response_socket)
@@ -271,17 +277,20 @@ def add_files_multipart():
             if type == 1:
                 # Store the file contents with Reed Solomon erasure coding
                 fragment_names = reedsolomon.store_file(data, max_erasures, send_task_socket, response_socket)
+                if measure_redundancy == 'true':
+                    t_full_redun = time.perf_counter()
             elif type == 2:
                 # Store the file, delegating encoding to random node
                 fragment_names = reedsolomon.store_file_delegate(data, max_erasures, heartbeat_socket,
                                                                  response_socket, context)
-                t_server_done = time.perf_counter()
-                if measure == 'true':
+                if measure_redundancy == 'true':
                     # Wait for all fragments to be stored
                     timer_socket = context.socket(zmq.REP)
                     timer_socket.bind("tcp://*:5545")
                     resp = timer_socket.recv_string()
                     print(resp)
+
+                    t_full_redun = time.perf_counter()
 
             if fragment_names is not None:
                 storage_details = {
@@ -296,13 +305,9 @@ def add_files_multipart():
         logging.error("Unexpected storage mode: %s" % storage_mode)
         return make_response("Wrong storage mode", 400)
 
-    t2 = time.perf_counter()
-    duration_all = t2-t1
-    logger_storing_all.info(str(len(data)) + "," + str(max_erasures) + "," + str(duration_all))
-
-    if measure == 'true':
-        duration_server = t_server_done-t1
-        logger_storing_server.info(str(len(data)) + "," + str(max_erasures) + "," + str(duration_server))
+    if measure_redundancy == 'true':
+        duration_full_redun = t_full_redun - t1
+        logger_full_redun.info(str(len(data)) + "," + str(max_erasures) + "," + str(duration_full_redun))
 
     # Insert the File record in the DB
     import json
@@ -314,8 +319,12 @@ def add_files_multipart():
     )
     db.commit()
 
-    return make_response({"id": cursor.lastrowid }, 201)
-#
+    t_server_done = time.perf_counter()
+    duration_server = t_server_done - t1
+    logger_lead_node.info(str(len(data)) + "," + str(max_erasures) + "," + str(duration_server))
+
+    return make_response({"id": cursor.lastrowid}, 201)
+
 
 @app.route('/files', methods=['POST'])
 def add_files():
@@ -336,13 +345,15 @@ def add_files():
     db.commit()
 
     # Return the ID of the new file record with HTTP 201 (Created) status code
-    return make_response({"id": cursor.lastrowid }, 201)
+    return make_response({"id": cursor.lastrowid}, 201)
+
+
 #
 
 
-@app.route('/services/rs_repair',  methods=['GET'])
+@app.route('/services/rs_repair', methods=['GET'])
 def rs_repair():
-    #Retrieve the list of files stored using Reed-Solomon from the database
+    # Retrieve the list of files stored using Reed-Solomon from the database
     db = get_db()
     cursor = db.execute("SELECT `id`, `storage_details`, `size` FROM `file` WHERE `storage_mode`='erasure_coding_rs'")
     if not cursor:
@@ -357,6 +368,8 @@ def rs_repair():
 
     return make_response({"fragments_missing": fragments_missing,
                           "fragments_repaired": fragments_repaired})
+
+
 #
 
 
@@ -364,6 +377,8 @@ def rs_automated_repair():
     print("Running automated Reed-Solomon repair process")
     with app.app_context():
         rs_repair()
+
+
 #
 
 
@@ -374,6 +389,6 @@ def server_error(e):
 
 
 # Start the Flask app (must be after the endpoint functions) 
-host_local_computer = "localhost" # Listen for connections on the local computer
-host_local_network = "0.0.0.0" # Listen for connections on the local network
+host_local_computer = "localhost"  # Listen for connections on the local computer
+host_local_network = "0.0.0.0"  # Listen for connections on the local network
 app.run(host=host_local_network if is_raspberry_pi() or is_docker() else host_local_computer, port=9000)
