@@ -222,7 +222,7 @@ while True:
 
         sockets = []
         for i, fragment in enumerate(encoded_fragments[:-1]):
-            ip = ips[i]
+            ip = ips[i % len(ips)]
             sock = context.socket(zmq.REQ)
             print("Sending fragment to:", ip)
             addr = "tcp://" + ip + ":5544"
