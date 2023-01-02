@@ -211,8 +211,8 @@ def get_file(coded_fragments, max_erasures, file_size,
 
     # Receive all chunks and insert them into the symbols array
     symbols = []
-    for _ in range(nodes_needed):
-        if response_socket.poll(500, zmq.POLLIN):
+    for _ in range(4):
+        if (response_socket.poll(500) & zmq.POLLIN) != 0:
             result = response_socket.recv_multipart()
             # In this case we don't care about the received name, just use the
             # data from the second frame

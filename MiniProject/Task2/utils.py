@@ -63,11 +63,12 @@ def check_nodes(heartbeat_request_socket, response_socket, n_nodes):
 
     return connected_nodes_fragments, connected_nodes_ip
 
+
 def get_fragments(heartbeat_request_socket, response_socket, n_nodes):
     connected_nodes_fragments = {}
 
 
-def get_connected_nodes(heartbeat_request_socket, response_socket, n_nodes):
+def get_connected_nodes(heartbeat_request_socket: zmq.Socket, response_socket: zmq.Socket, n_nodes):
     connected_nodes_ip = []
 
     task = messages_pb2.heartbeat_request()
@@ -80,6 +81,8 @@ def get_connected_nodes(heartbeat_request_socket, response_socket, n_nodes):
             connected_nodes_ip.append(msg)
 
     return connected_nodes_ip
+
+
 def is_raspberry_pi():
     """
     Returns True if the current platform is a Raspberry Pi, otherwise False.
