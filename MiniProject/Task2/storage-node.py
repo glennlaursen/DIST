@@ -192,8 +192,8 @@ while True:
         task = messages_pb2.heartbeat_request()
         task.ParseFromString(msg[1])
 
-        fragments = os.listdir(data_folder)
-        fragments.remove('.id')
+        #fragments = os.listdir(data_folder)
+        #fragments.remove('.id')
 
         print("Status request for node: %s - Alive" % node_id)
 
@@ -201,9 +201,11 @@ while True:
         response = messages_pb2.heartbeat_response()
         response.node_id = node_id
         response.node_ip = own_ip
-        response.fragments.extend(fragments)
+        #response.fragments.extend(fragments)
 
-        sender.send(response.SerializeToString())
+        #sender.send(response.SerializeToString())
+        print(own_ip)
+        sender.send_string(own_ip)
 
     if encode_socket in socks:
         msg = encode_socket.recv_pyobj()

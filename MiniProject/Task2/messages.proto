@@ -45,5 +45,5 @@ message heartbeat_request
 message heartbeat_response {
     string node_id = 1;
     string node_ip = 2;
-    repeated string fragments = 3;
+    //repeated string fragments = 3;
 }
