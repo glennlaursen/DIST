@@ -4,6 +4,7 @@ Aarhus University - Distributed Storage course - Lab 4
 Storage Node
 """
 import socket
+import time
 
 import zmq
 import messages_pb2
@@ -49,7 +50,7 @@ except FileNotFoundError:
 
 if is_raspberry_pi():
     # On the Raspberry Pi: ask the user to input the last segment of the server IP address
-    server_address = input("Server address: 192.168.0.___ ")
+    server_address = "101" #input("Server address: 192.168.0.___ ")
     pull_address = "tcp://192.168.0." + server_address + ":5557"
     push_address = "tcp://192.168.0." + server_address + ":5558"
     subscriber_address = "tcp://192.168.0." + server_address + ":5559"
@@ -207,7 +208,7 @@ while True:
         max_erasures = int(msg['max_erasures'])
         n_nodes = int(msg['n_nodes'])
 
-        fragment_names = [random_string(8) for x in range(n_nodes)]
+        fragment_names = [random_string(8) for _ in range(n_nodes)]
 
         # Return generated names to signal lead node can continue
         encode_socket.send_pyobj({

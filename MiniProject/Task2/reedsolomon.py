@@ -8,7 +8,7 @@ import copy  # for deepcopy
 
 import zmq
 
-from utils import random_string, create_logger, get_connected_nodes
+from utils import random_string, create_logger, get_connected_nodes, get_k_node_ips
 import messages_pb2
 import json
 
@@ -17,7 +17,6 @@ import logging
 # Create custom loggers
 logger_encoding = create_logger("rs_encoding", "log_rs_en.log")
 logger_decoding = create_logger("rs_decoding", "log_rs_de.log")
-#logger_storing = create_logger("rs_storing", "log_rs_st.log")
 
 STORAGE_NODES_NUM = 4
 
@@ -104,18 +103,16 @@ def store_file(file_data, max_erasures, send_task_socket, response_socket):
 
 def store_file_delegate(data, max_erasures, heartbeat_socket, response_socket, context):
     # Delegate storage
-    connected_nodes = get_connected_nodes(heartbeat_socket, response_socket, STORAGE_NODES_NUM)
-    rand_ip = random.choice(connected_nodes)
-    print("Delegating encoding to", rand_ip)
-    connected_nodes.remove(rand_ip)
+    ips = get_k_node_ips(STORAGE_NODES_NUM)
+    print("Delegating encoding to", ips[0])
 
     encode_socket = context.socket(zmq.REQ)
-    addr = "tcp://" + rand_ip + ':5542'
+    addr = "tcp://" + ips[0] + ':5542'
     encode_socket.connect(addr)
 
     encode_socket.send_pyobj({
         "data": data,
-        "ips": connected_nodes,
+        "ips": ips[1:],
         "max_erasures": max_erasures,
         "n_nodes": STORAGE_NODES_NUM
     })
@@ -194,7 +191,7 @@ def get_file(coded_fragments, max_erasures, file_size,
     # Receive all chunks and insert them into the symbols array
     symbols = []
     for _ in range(len(fragnames)):
-        if (response_socket.poll(500) & zmq.POLLIN) != 0:
+        if (response_socket.poll(1000) & zmq.POLLIN) != 0:
             result = response_socket.recv_multipart()
             # In this case we don't care about the received name, just use the
             # data from the second frame
@@ -234,7 +231,7 @@ def get_file_delegate(coded_fragments, max_erasures, file_size,
     # Receive all chunks and insert them into the symbols array
     symbols = []
     for _ in range(len(fragnames)):
-        if (response_socket.poll(500) & zmq.POLLIN) != 0:
+        if (response_socket.poll(1000) & zmq.POLLIN) != 0:
             result = response_socket.recv_multipart()
             # In this case we don't care about the received name, just use the
             # data from the second frame

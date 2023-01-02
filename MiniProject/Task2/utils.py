@@ -6,6 +6,9 @@ import messages_pb2
 import zmq
 import logging
 
+node_ips = ['192.168.0.10' + i for i in ["1", "2", "3", "4"]]
+node_names_for_docker = ['node' + i for i in ["1", "2", "3", "4"]]
+
 
 def random_string(length=8):
     """
@@ -66,7 +69,7 @@ def is_raspberry_pi():
     """
     Returns True if the current platform is a Raspberry Pi, otherwise False.
     """
-    return 'raspberyypi' in platform.uname().node
+    return 'raspberrypi' in platform.uname().node
 
 
 def is_docker():
@@ -80,3 +83,12 @@ def create_logger(name, path):
     f_handler.setFormatter(logging.Formatter('%(message)s'))
     logger.addHandler(f_handler)
     return logger
+
+
+def get_k_node_ips(k: int):
+    if is_raspberry_pi():
+        return random.sample(node_ips, k)
+    elif is_docker():
+        return random.sample(node_names_for_docker, k)
+    else:
+        return random.sample(node_ips, k)

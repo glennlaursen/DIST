@@ -1,23 +1,18 @@
 """
 Aarhus University - Distributed Storage course - Lab 6
 
-REST API + RAID Controller
+REST API + Controller
 """
 import flask
 from flask import Flask, make_response, g, request, send_file
 import sqlite3
 import base64
-import random
-import string
 import logging
 
 import zmq  # For ZMQ
 import time  # For waiting a second for ZMQ connections
-import math  # For cutting the file in half
-import messages_pb2  # Generated Protobuf messages
 import io  # For sending binary data in a HTTP response
 
-import raid1
 import reedsolomon
 
 from utils import is_raspberry_pi, is_docker, create_logger
@@ -128,19 +123,7 @@ def download_file(file_id):
     import json
     storage_details = json.loads(f['storage_details'])
 
-    if f['storage_mode'] == 'raid1':
-
-        part1_filenames = storage_details['part1_filenames']
-        part2_filenames = storage_details['part2_filenames']
-
-        file_data = raid1.get_file(
-            part1_filenames,
-            part2_filenames,
-            data_req_socket,
-            response_socket
-        )
-
-    elif f['storage_mode'] == 'erasure_coding_rs':
+    if f['storage_mode'] == 'erasure_coding_rs':
 
         coded_fragments = storage_details['coded_fragments']
         max_erasures = storage_details['max_erasures']
@@ -249,20 +232,12 @@ def add_files_multipart():
     size = len(data)
     print("File received: %s, size: %d bytes, type: %s" % (filename, size, content_type))
 
-    # Read the requested storage mode from the form (default value: 'raid1')
-    storage_mode = payload.get('storage', 'raid1')
+    # Read the requested storage mode from the form (default value: 'erasure_coding_rs')
+    storage_mode = payload.get('storage', 'erasure_coding_rs')
     print("Storage mode: %s" % storage_mode)
     measure_redundancy = payload.get('measure_redundancy', 'false')
 
-    if storage_mode == 'raid1':
-        file_data_1_names, file_data_2_names = raid1.store_file(data, send_task_socket, response_socket)
-
-        storage_details = {
-            "part1_filenames": file_data_1_names,
-            "part2_filenames": file_data_2_names
-        }
-
-    elif storage_mode == 'erasure_coding_rs':
+    if storage_mode == 'erasure_coding_rs':
         # Reed Solomon code
         # Parse max_erasures (everything is a string in request.form, 
         # we need to convert to int manually), set default value to 1
@@ -288,6 +263,7 @@ def add_files_multipart():
                     timer_socket = context.socket(zmq.REP)
                     timer_socket.bind("tcp://*:5545")
                     resp = timer_socket.recv_string()
+                    timer_socket.close()
                     print(resp)
 
                     t_full_redun = time.perf_counter()
@@ -326,31 +302,6 @@ def add_files_multipart():
     return make_response({"id": cursor.lastrowid}, 201)
 
 
-@app.route('/files', methods=['POST'])
-def add_files():
-    payload = request.get_json()
-    filename = payload.get('filename')
-    content_type = payload.get('content_type')
-    file_data = base64.b64decode(payload.get('contents_b64'))
-    size = len(file_data)
-
-    file_data_1_names, file_data_2_names = raid1.store_file(file_data, send_task_socket, response_socket)
-
-    # Insert the File record in the DB
-    db = get_db()
-    cursor = db.execute(
-        "INSERT INTO `file`(`filename`, `size`, `content_type`, `part1_filenames`, `part2_filenames`) VALUES (?,?,?,?,?)",
-        (filename, size, content_type, ','.join(file_data_1_names), ','.join(file_data_2_names))
-    )
-    db.commit()
-
-    # Return the ID of the new file record with HTTP 201 (Created) status code
-    return make_response({"id": cursor.lastrowid}, 201)
-
-
-#
-
-
 @app.route('/services/rs_repair', methods=['GET'])
 def rs_repair():
     # Retrieve the list of files stored using Reed-Solomon from the database
@@ -368,18 +319,6 @@ def rs_repair():
 
     return make_response({"fragments_missing": fragments_missing,
                           "fragments_repaired": fragments_repaired})
-
-
-#
-
-
-def rs_automated_repair():
-    print("Running automated Reed-Solomon repair process")
-    with app.app_context():
-        rs_repair()
-
-
-#
 
 
 @app.errorhandler(500)
