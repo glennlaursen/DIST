@@ -45,28 +45,6 @@ def write_file(data, filename=None):
     return filename
 
 
-def check_nodes(heartbeat_request_socket, response_socket, n_nodes):
-    connected_nodes_fragments = {}
-    connected_nodes_ip = []
-
-    task = messages_pb2.heartbeat_request()
-    heartbeat_request_socket.send_multipart([b"all_nodes", task.SerializeToString()])
-
-    # Check to see which nodes are alive
-    for i in range(n_nodes):
-        if response_socket.poll(500, zmq.POLLIN):
-            msg = response_socket.recv()
-            response = messages_pb2.heartbeat_response()
-            response.ParseFromString(msg)
-            connected_nodes_fragments[response.node_id] = response.fragments
-            connected_nodes_ip.append(response.node_ip)
-
-    return connected_nodes_fragments, connected_nodes_ip
-
-def get_fragments(heartbeat_request_socket, response_socket, n_nodes):
-    connected_nodes_fragments = {}
-
-
 def get_connected_nodes(heartbeat_request_socket, response_socket, n_nodes):
     connected_nodes_ip = []
 
@@ -76,10 +54,14 @@ def get_connected_nodes(heartbeat_request_socket, response_socket, n_nodes):
     # Check to see which nodes are alive
     for i in range(n_nodes):
         if (response_socket.poll(500) & zmq.POLLIN) != 0:
-            msg = response_socket.recv_string()
-            connected_nodes_ip.append(msg)
+            msg = response_socket.recv()
+            response = messages_pb2.heartbeat_response()
+            response.ParseFromString(msg)
+            connected_nodes_ip.append(response.node_ip)
 
     return connected_nodes_ip
+
+
 def is_raspberry_pi():
     """
     Returns True if the current platform is a Raspberry Pi, otherwise False.

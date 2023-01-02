@@ -192,20 +192,13 @@ while True:
         task = messages_pb2.heartbeat_request()
         task.ParseFromString(msg[1])
 
-        #fragments = os.listdir(data_folder)
-        #fragments.remove('.id')
-
         print("Status request for node: %s - Alive" % node_id)
 
         # Send the response
         response = messages_pb2.heartbeat_response()
-        response.node_id = node_id
         response.node_ip = own_ip
-        #response.fragments.extend(fragments)
 
-        #sender.send(response.SerializeToString())
-        print(own_ip)
-        sender.send_string(own_ip)
+        sender.send(response.SerializeToString())
 
     if encode_socket in socks:
         msg = encode_socket.recv_pyobj()
@@ -216,6 +209,7 @@ while True:
 
         fragment_names = [random_string(8) for x in range(n_nodes)]
 
+        # Return generated names to signal lead node can continue
         encode_socket.send_pyobj({
             "names": fragment_names
         })
@@ -263,7 +257,7 @@ while True:
 
         for i in range(0, len(msg) - 1):
             data = msg[1 + i]
-            print('Chunk to save: %s, size: %d bytes' % (task.filename + "." + str(i), len(data)))
+            print('Chunk to save: %s, size: %d bytes' % (task.filename, len(data)))
             # Store the chunk with the given filename
             chunk_local_path = data_folder + '/' + task.filename
             write_file(data, chunk_local_path)
