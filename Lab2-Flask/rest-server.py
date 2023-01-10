@@ -17,6 +17,8 @@ def get_db():
     g.db.row_factory = sqlite3.Row
     return g.db
 
+var = None
+
 
 def close_db(e=None):
     # Close the DB connection and remove it from the 'g' object
